@@ -40,6 +40,9 @@ Optional properties:
     -pm8941_torch
 - qcom,slave-id : should contain i2c slave address, device id address
     and expected id read value.
+- qcom,cci-master : should contain i2c master id to be used for this flash.
+    - 0 -> MASTER 0
+    - 1 -> MASTER 1
 
 Example:
 

@@ -186,6 +186,7 @@ static int scm_pas_enable_bw(void)
 			goto err_clk;
 
 	mutex_unlock(&scm_pas_bw_mutex);
+
 	return ret;
 
 err_clk:
@@ -211,6 +212,7 @@ static void scm_pas_disable_bw(void)
 	for (i = NUM_CLKS - 1; i >= 0; i--)
 		clk_disable_unprepare(scm_clocks[i]);
 	mutex_unlock(&scm_pas_bw_mutex);
+
 }
 
 static void scm_pas_init(int id)
@@ -594,7 +596,6 @@ static int pil_init_image_trusted(struct pil_desc *pil,
 		scm_pas_disable_bw();
 		return -ENOMEM;
 	}
-
 	memcpy(mdata_buf, metadata, size);
 
 	request.proc = d->pas_id;
@@ -602,6 +603,8 @@ static int pil_init_image_trusted(struct pil_desc *pil,
 
 	ret = scm_call(SCM_SVC_PIL, PAS_INIT_IMAGE_CMD, &request,
 			sizeof(request), &scm_ret, sizeof(scm_ret));
+
+
 
 	dma_free_attrs(&dev, size, mdata_buf, mdata_phys, &attrs);
 	scm_pas_disable_bw();

@@ -65,6 +65,10 @@
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>
+#ifdef CONFIG_HUAWEI_KERNEL
+#include <linux/qpnp/power-on.h>
+extern u32 pon_regs[MAX_REG_TYPE];
+#endif
 
 #ifdef CONFIG_X86
 #include <asm/nmi.h>
@@ -799,6 +803,17 @@ static struct ctl_table kern_table[] = {
 		.extra1		= &zero,
 		.extra2		= &two,
 	},
+
+#ifdef CONFIG_HUAWEI_KERNEL
+	{
+		.procname	= "huawei_flow_level",
+		.data		= &KERNEL_HWFLOW,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+#endif
+
 #endif
 	{
 		.procname	= "ngroups_max",
@@ -1095,6 +1110,17 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0444,
 		.proc_handler	= proc_dointvec,
 	},
+#endif
+#ifdef CONFIG_HUAWEI_KERNEL
+#ifndef HIDE_PRODUCT_INFO_KERNEL
+	{
+		.procname	= "hide_info",
+		.data		= &hide_info,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+#endif
 #endif
 /*
  * NOTE: do not add new entries to this table unless you have read
@@ -1692,6 +1718,15 @@ static struct ctl_table debug_table[] = {
 		.extra2		= &one,
 	},
 #endif
+#ifdef CONFIG_HUAWEI_KERNEL
+    {
+            .procname   = "poweronoff_reason",
+            .data       = pon_regs,
+            .maxlen     = sizeof(pon_regs),
+            .mode       = 0644,
+            .proc_handler   = proc_dointvec,
+    },
+#endif	
 	{ }
 };
 

@@ -28,29 +28,29 @@ dtb-$(CONFIG_ARCH_MSM8974) += msm8974-v1-cdp.dtb \
 	msm8974pro-ac-pm8941-liquid.dtb \
 	msm8974pro-ac-pm8941-mtp.dtb \
 	msm8974pro-ac-pma8084-pm8941-mtp.dtb
-dtb-$(CONFIG_ARCH_MSM8916) += msm8916-sim.dtb \
-	msm8916-rumi.dtb \
-	msm8916-cdp.dtb \
-	msm8916-cdp-smb1360.dtb \
-	msm8916-mtp.dtb \
-	msm8916-512mb-mtp.dtb \
-	msm8916-mtp-smb1360.dtb \
-	msm8916-512mb-mtp-smb1360.dtb \
-	msm8916-512mb-qrd-skui.dtb \
-	msm8916-qrd-skuh.dtb \
-	msm8916-qrd-skuhf.dtb \
-	msm8916-qrd-skui.dtb \
-	msm8916-qrd-skuic.dtb \
-	msm8916-512mb-qrd-skuh.dtb \
-	apq8016-mtp.dtb \
-	apq8016-mtp-smb1360.dtb \
-	msm8939-sim.dtb \
-	msm8939-rumi.dtb \
-	msm8939-qrd-skuk.dtb \
-	msm8939-cdp.dtb \
-	msm8939-cdp-smb1360.dtb \
-	msm8939-mtp.dtb \
-	msm8939-mtp-smb1360.dtb
+#add Y550 VersionC boardID,delete y550-cl tl ul boardID
+#add cherry versionB versionC boardID
+#delete files: huawei_cherry_tl10_va.dtb huawei_cherry_ul10_va.dtb huawei_cherry_cl10_va.dtb and huawei_cherry_l09_va.dtb
+#change the name of file huawei_cherry_tl00_va.dtb to huawei_cherry_cl20_va.dtb
+#change the name of file huawei_ulc02_va.dtb to huawei_ulc02_ul01_va.dtb
+dtb-$(CONFIG_ARCH_MSM8916) += msm8916-qrd-skuh.dtb \
+	huawei_c8817d_va.dtb \
+	huawei_c8817e_va.dtb \
+	huawei_g620s_ul_va.dtb \
+	huawei_g621_tl00_vb.dtb \
+	huawei_c8817d_vb.dtb \
+	huawei_c8817e_vb.dtb \
+	huawei_g620s_l01_va.dtb \
+	huawei_g620s_l02_va.dtb \
+	huawei_g620s_l03_va.dtb \
+	huawei_g620s_l01_vb.dtb \
+	huawei_g620s_l02_vb.dtb \
+	huawei_g620s_l03_vb.dtb \
+	huawei_g620s_ul_vb.dtb \
+	huawei_g621_tl_vc.dtb \
+	huawei_c8817d_vc.dtb \
+	huawei_c8817e_vc.dtb \
+	huawei_g620s_ul_vc.dtb
 dtb-$(CONFIG_ARCH_MSM8226) += msm8226-sim.dtb \
 	msm8226-fluid.dtb \
 	msm8226-v1-cdp.dtb \
