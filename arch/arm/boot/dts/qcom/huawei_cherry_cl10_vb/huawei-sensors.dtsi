@@ -118,11 +118,11 @@
 		vio-supply = <&pm8916_l6>;
 		rpr521,irq-gpio = <&msm_gpio 113 0x2>;
 		rpr521,ps_threshold = <600>;
-		rpr521,window = <52>;
-		rpr521,wave = <37>;
-		rpr521,data0_array = <9290 7711 2079 1810>; 
-		rpr521,data1_array = <5303 4367 685 580>;   
-		rpr521,judge_array = <1000 1422 1700 3100>;
+		rpr521,window = <49>;
+		rpr521,wave = <20>;
+		rpr521,data0_array = <7768 4388 2627 1971>;
+		rpr521,data1_array = <5066 2315 1106 687>;
+		rpr521,judge_array = <1032 1605 1904 2864>;
 	};
 
 	st@18 {
@@ -178,12 +178,5 @@
 		huawei,hall_gpio_config_rs = <&msm_gpio 69 0x2>;
 		hall_poles = <1>;
 		status = "ok";
-	};
-};
-
- / {
-	huawei_sensor_info {
-		compatible = "huawei,hw_sensor_info";
-		product_name = "Cherry-CL10";
 	};
 };

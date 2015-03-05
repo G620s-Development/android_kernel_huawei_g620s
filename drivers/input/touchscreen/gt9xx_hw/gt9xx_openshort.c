@@ -27,50 +27,48 @@
 // short test
 #define GTP_SHORT_GND
 #define GTP_VDD         28      // 2.8V
-#define DRIVER_AND_SONSOR_CONVERSION     2
-#define DELAY_TIME_AFTER_SEND_CONFIG     280
+
 // open test
 #define DEFAULT_TEST_ITEMS  (_MAX_TEST | _MIN_TEST | _KEY_MAX_TEST | _KEY_MIN_TEST /*| _UNIFORMITY_TEST*/)
 /*add the flag for goodix rawdata test*/
-/*rawdata config for new pattern*/
 u8 nc[] = {
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
 };
 /*the test config is used for openshort test*/
 u8 test_config[] = {
-	0x00,0xD0,0x02,0x00,0x05,0x05,0x31,0x00,0x01,0x08,
-	0x14,0x0A,0x4B,0x32,0x03,0x00,0x00,0x00,0x00,0x00,
-	0x12,0x11,0x0C,0x15,0x19,0x23,0x14,0x85,0x25,0xBB,
-	0x59,0x5B,0x7C,0x06,0x00,0x00,0x00,0x03,0x33,0x11,
-	0x00,0x15,0x00,0x00,0x17,0x02,0x03,0x05,0x00,0x00,
-	0x00,0x56,0x78,0x54,0x45,0x02,0x07,0x00,0x00,0x04,
-	0x81,0x58,0x00,0x78,0x5F,0x00,0x71,0x65,0x00,0x6A,
-	0x6C,0x00,0x63,0x74,0x00,0x63,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x00,0x00,0x00,0x00,0x1E,0x33,0x00,0x00,
-	0x01,0x01,0x01,0x00,0x03,0x02,0x05,0x04,0x07,0x06,
-	0x09,0x08,0x0D,0x0C,0x0F,0x0E,0x11,0x10,0x13,0x12,
-	0x17,0x16,0x19,0x18,0xFF,0xFF,0xFF,0xFF,0x00,0x00,
-	0x00,0x00,0x0C,0x0B,0x0A,0x09,0x08,0x27,0x26,0x25,
-	0x24,0x28,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x02,0x0A,0x00,0x07,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x00,0x00,0x00,0x00,0x41,0x01};
+    0x00,0xD0,0x02,0x00,0x05,0x05,0x34,0x00,0x02,0x0A,
+    0x19,0x08,0x50,0x3C,0x03,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x08,0x18,0x1E,0x26,0x14,0x85,0x25,0xAA,
+    0x52,0x54,0xE2,0x04,0x00,0x00,0x00,0x9A,0x03,0x1D,
+    0x3C,0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x50,0x96,0x94,0x45,0x02,0x07,0x00,0x00,0x04,
+    0x9C,0x55,0x00,0x87,0x60,0x00,0x75,0x6D,0x00,0x67,
+    0x7C,0x00,0x5B,0x8D,0x00,0x5B,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x01,0x00,0x03,0x02,0x05,0x04,0x07,0x06,
+    0x09,0x08,0x0D,0x0C,0x0F,0x0E,0x11,0x10,0x13,0x12,
+    0x17,0x16,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,
+    0x00,0x00,0x0C,0x0B,0x0A,0x09,0x08,0x27,0x26,0x25,
+    0x24,0x28,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x14,0x19,
+    0x1E,0x14,0x19,0x1E,0x18,0x1E,0x26,0x14,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x75,0x01};
+
 u16 key_max_limits[4] = {0};
 u16 key_min_limits[4] = {0};
 u16 max_limit_value = 3978;     // screen max limit
@@ -385,34 +383,18 @@ static s32 gtp_i2c_end_cmd(struct i2c_client *client)
 static void gtp_hopping_switch(struct i2c_client *client, s32 on)
 {
     u8 config[256] = {(u8)(GTP_REG_CONFIG_DATA >> 8), (u8)GTP_REG_CONFIG_DATA, 0};
-    s32 ret = -1;
     if (!on)
     {
         // disable hopping before open test
         memcpy(&config[2], test_config, sizeof(test_config));
-        /*add returned value for coverity*/
-        ret = gtp_i2c_write(client, config, GTP_CONFIG_MAX_LENGTH + GTP_ADDR_LENGTH);
-        if (ret < 0){
-            tp_log_err("%s, failed to disable hopping, LINE = %d, ret = %d\n", 
-                __func__, __LINE__, ret);
-            return;
-        }
-        /*delay 280ms ,make sure that sending config is successful*/
-        msleep(DELAY_TIME_AFTER_SEND_CONFIG);
+        gtp_i2c_write(client, config, GTP_CONFIG_MAX_LENGTH + GTP_ADDR_LENGTH);
+        msleep(50);
     }
     else
     {   
         //enable hopping after open test
         gtp_reset_guitar(client, RESET_TIME_50_MS);
-        /*add returned value for coverity*/
-        ret = gtp_send_cfg(client);
-        if (ret < 0){
-            tp_log_err("%s, failed to enable hopping, LINE = %d, ret = %d\n", 
-                __func__, __LINE__, ret);
-            return;
-        }
-        /*delay 280ms ,make sure that sending config is successful*/
-        msleep(DELAY_TIME_AFTER_SEND_CONFIG);
+        gtp_send_cfg(client);
     }
 }
 /*To parse the information by goodix config, include drv and sen number,IC type */
@@ -430,9 +412,7 @@ s32 gtp_parse_config(struct i2c_client *client)
                     + (config[GTP_ADDR_LENGTH + GT9_REG_SEN_DRV_CNT+1 -GT9_REG_CFG_BEG] & 0x1F);
     gt9xx_sen_num = (config[GTP_ADDR_LENGTH + GT9_REG_SEN_DRV_CNT+2-GT9_REG_CFG_BEG] & 0x0F) 
                     + ((config[GTP_ADDR_LENGTH + GT9_REG_SEN_DRV_CNT+2-GT9_REG_CFG_BEG]>>4) & 0x0F);
-    /* driver and sensor conversion for dual induction module*/
-    gt9xx_drv_num = gt9xx_drv_num*DRIVER_AND_SONSOR_CONVERSION;
-    gt9xx_sen_num = gt9xx_sen_num/DRIVER_AND_SONSOR_CONVERSION;
+
     tp_log_info("%s,Driver num: %d, Sensor Num: %d \n", __func__, gt9xx_drv_num, gt9xx_sen_num);
     if (gt9xx_drv_num < MIN_DRIVER_NUM || gt9xx_drv_num > MAX_DRIVER_NUM)
     {
@@ -1073,19 +1053,12 @@ s32 gt9_test_gnd_vdd_short(struct i2c_client *client)
  */
 void gt9xx_leave_short_test(struct i2c_client *client)
 {
-    s32 ret = -1;
     
     gtp_reset_guitar(client, RESET_TIME_20_MS);
     msleep(100);
 
-    /*add returned value for coverity*/
-    ret = gtp_send_cfg(client);
-    if (ret < 0){
-        tp_log_err("%s, failed to leave short test, LINE = %d, ret = %d\n", 
-            __func__, __LINE__, ret);
-    }else{
-        msleep(50);
-    }
+    gtp_send_cfg(client);
+    msleep(50);
     SET_INFO_LINE_INFO("");
     SET_INFO_LINE_INFO("---gtp short test end---");
 }
@@ -1581,7 +1554,7 @@ s32 gtp_read_rawdata(struct i2c_client* client, u16* data, u16 rawdata_num)
     memcpy(buffer, data, gt9xx_drv_num * gt9xx_sen_num * 2);
     for (i = 0; i < gt9xx_drv_num * gt9xx_sen_num; i++)
     {
-        data[(i % gt9xx_sen_num) * gt9xx_drv_num + i / gt9xx_sen_num] = buffer[i];
+        data[(i % gt9xx_drv_num) * gt9xx_sen_num + i / gt9xx_drv_num] = buffer[i];
     }
     kfree(buffer);
 
@@ -1650,9 +1623,9 @@ static void gtp_raw_min_test(u16 *raw_buf)
     {
         if ((raw_buf[i] < gtp_full_raw_min_cap[i]) && (nc[i] == 0))
         {
-            test_rslt_buf[rslt_buf_idx] |= _BEYOND_MIN_LIMIT;
-            driver = (i/gt9xx_drv_num);
-            sensor = (i%gt9xx_drv_num);
+            test_rslt_buf[rslt_buf_idx] |= _BEYOND_MIN_LIMIT;       
+            driver = (i/gt9xx_sen_num); 
+            sensor = (i%gt9xx_sen_num);
             new_flag = 0;
             for (j = sum_base; j < (sum_base+_BEYOND_INFO_MAX); ++j)
             {
@@ -1705,8 +1678,8 @@ static void gtp_raw_max_test(u16 *raw_buf)
         if ((raw_buf[i] > gtp_full_raw_max_cap[i]) && (nc[i] == 0))
         {
             test_rslt_buf[rslt_buf_idx] |= _BEYOND_MAX_LIMIT;
-            driver = (i/gt9xx_drv_num);
-            sensor = (i%gt9xx_drv_num);
+            driver = (i/gt9xx_sen_num);
+            sensor = (i%gt9xx_sen_num);
             new_flag = 0;
             for (j = sum_base; j < (sum_base+_BEYOND_INFO_MAX); ++j)
             {
@@ -2154,10 +2127,11 @@ static void record_tp_capacitance( int value)
     snprintf(buf, PAGE_SIZE, "%4d ", value);
     strncat(g_touch_capacitance, buf, sizeof(buf));
     g_capacitance_count++;
-    if(0 == g_capacitance_count % gt9xx_drv_num)
+    if(0 == g_capacitance_count % gt9xx_sen_num)
     {
         strncat(g_touch_capacitance, "\n", sizeof("\n"));
     }
+
     return;
 }
 
@@ -2260,16 +2234,14 @@ open_test_exit:
         kfree(touchpad_sum);
         touchpad_sum = NULL;
     }
-
+    gtp_irq_enable(ts);
+#if GTP_ESD_PROTECT
+    ts->gtp_is_suspend = 0;     // resume esd
+#endif
     ts->gtp_rawdiff_mode = 0;
     gt9_read_coor_cmd(client);	// back to read coordinates data 
     SET_INFO_LINE_INFO("---gtp open test end---");
     gtp_hopping_switch(client, 1);
-    /*enable irq after opentest ended and closed hopping*/
-    gtp_irq_enable(ts);
-#if GTP_ESD_PROTECT
-    ts->gtp_is_suspend = 0; 	// resume esd
-#endif
     return ret;
 }
 
@@ -2511,5 +2483,5 @@ void gtp_test_sysfs_deinit(void)
 {
     
     sysfs_remove_file(goodix_debug_kobj, &dev_attr_openshort.attr);
-    /*To delete the kobject_del(goodix_debug_kobj)*/
+    kobject_del(goodix_debug_kobj);
 }

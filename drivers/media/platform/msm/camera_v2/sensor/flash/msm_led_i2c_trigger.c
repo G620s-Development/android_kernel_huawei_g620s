@@ -31,7 +31,7 @@
 #define FLASH_NAME "camera-led-flash"
 #define CAM_FLASH_PINCTRL_STATE_SLEEP "cam_flash_suspend"
 #define CAM_FLASH_PINCTRL_STATE_DEFAULT "cam_flash_default"
-#define CONFIG_MSMB_CAMERA_DEBUG
+/*#define CONFIG_MSMB_CAMERA_DEBUG*/
 #undef CDBG
 #ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)

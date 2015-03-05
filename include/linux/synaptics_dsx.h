@@ -165,10 +165,6 @@ struct synaptics_dsx_platform_data {
 	bool y_flip;
 	bool swap_axes;
 	bool reg_en;
-	unsigned char grip_left_lsb;
-	unsigned char grip_left_msb;
-	unsigned char grip_right_lsb;
-	unsigned char grip_right_msb;
 	int irq_gpio;
 	int power_gpio;
 	int power_on_state;
@@ -200,10 +196,6 @@ struct synaptics_dsx_platform_data {
 	unsigned int easy_wakeup_supported_gestures;
 	bool glove_supported;
 	bool esd_support;
-	bool low_power_support;
-	bool glove_edge_switch_supported;
-	bool grip_algorithm_supported;
-	bool grip_algorithm_enabled;
 	struct syanptics_wakeup_keys *wakeup_keys;
 	unsigned char fast_relax_gesture;
 	/*Add doze wakeup threshold param for tempreture performance*/

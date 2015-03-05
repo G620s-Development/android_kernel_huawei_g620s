@@ -334,8 +334,6 @@ static int mdss_dsi_panel_cabc_ctrl(struct mdss_panel_data *pdata,struct msmfb_c
 	}
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
-	/* Avoid occur with setting backlight at sametime*/
-	msleep(30);
 	switch(cabc_cfg.mode)
 	{
 		case CABC_MODE_UI:

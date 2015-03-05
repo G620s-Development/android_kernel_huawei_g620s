@@ -95,11 +95,8 @@
 #define CAPACITY_DEBOUNCE_MAX	4
 #define CUTOFF_LEVEL	2
 #define FAKE_CUTOFF_LEVEL	3
-/* Remove 3450mV cutoff voltage */
-#define ZERO_LEVEL	0
-#define ZERO_LEVEL_COUNT	10
+#define CUTOFF_VOLTAGE		3450
 #define MAX_SOC_CHANGE	1
-#define ZERO_LEVEL_VOLTAGE		3350
 
 struct bq27510_device_info
 {

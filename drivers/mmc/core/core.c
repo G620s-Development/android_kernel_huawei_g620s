@@ -2162,17 +2162,7 @@ void mmc_power_up(struct mmc_host *host)
 	 * This delay should be sufficient to allow the power supply
 	 * to reach the minimum voltage.
 	 */
-	/*For sdcard we increase delay to 150ms to give rpm more time to operate.*/
-#ifdef CONFIG_HUAWEI_KERNEL
-	if(!strcmp(mmc_hostname(host), "mmc1")) {
-		mmc_delay(150);
-	}
-	else {
-		mmc_delay(10);
-	}
-#else
 	mmc_delay(10);
-#endif
 
 	host->ios.clock = host->f_init;
 

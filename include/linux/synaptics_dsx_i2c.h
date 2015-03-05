@@ -56,12 +56,6 @@
 #define F54_QUERY_BASE (0x01E9)
 #define F55_QUERY_BASE (0x03E3)
 
-#define PDT_P0_F01_RMI_CTRL_BASE	(0x0051)
-#define PDT_P4_F51_CUSTOM_CTRL_BASE	(0x0419)
-#define F01_CTRL_05_OFFSET	(4)
-#define F01_CTRL_09_OFFSET	(5)
-#define F51_CTRL_01_OFFSET	(1)
-#define F51_CTRL_04_OFFSET	(4)
 #define SYNAPTICS_RMI4_F01 (0x01)
 #define SYNAPTICS_RMI4_F11 (0x11)
 #define SYNAPTICS_RMI4_F12 (0x12)
@@ -229,7 +223,7 @@ struct synaptics_rmi4_device_info {
 #define F54_ANALOG_CTRL13_OFFSET 16
 #define F11_2D_CTRL92_OFFSET 45
 #define F51_CUSTOM_CTRL63_OFFSET 14
-#define CHERRY_PRODUCT_NAME ("cherry")
+
 #define TP_ERR  1
 #define TP_WARNING 2
 #define TP_INFO 3
@@ -345,7 +339,6 @@ struct synaptics_rmi4_data {
 	struct work_struct  work;
 	/* add a delay work for easy wake up work */
 	struct delayed_work delay_work;
-	struct delayed_work glove_delay_work;
 	struct notifier_block fb_notif;
 	unsigned short f11_query_base_addr;
 	unsigned short f11_cmd_base_addr;
@@ -374,14 +367,6 @@ struct synaptics_rmi4_data {
 	bool glove_enabled;
 	bool holster_enabled;
 	bool sleep_gesture_flag;
-	unsigned char f51_ctrl_01_val;
-	unsigned char f51_ctrl_04_val;
-	unsigned char f01_ctrl_05_val;
-	unsigned char f01_ctrl_09_val;
-	unsigned char f51_ctrl_01_low_sensitivity_val;
-	unsigned char f51_ctrl_04_low_sensitivity_val;
-	unsigned char f01_ctrl_05_low_sensitivity_val;
-	unsigned char f01_ctrl_09_low_sensitivity_val;
 #endif /*CONFIG_HUAWEI_KERNEL*/
 };
 

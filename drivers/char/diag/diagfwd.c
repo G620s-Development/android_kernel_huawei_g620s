@@ -334,223 +334,6 @@ static int check_bufsize_for_encoding(struct diag_smd_info *smd_info, void *buf,
 }
 
 #ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-static int check_usb_bufsize_for_encoding(struct diag_smd_info *smd_info, void *buf,
-					int total_recd)
-{
-	int buf_size = IN_BUF_SIZE;
-	int max_size = 2 * total_recd + 3;
-	unsigned char *temp_buf;
-
-	if (max_size > IN_BUF_SIZE) {
-		if (max_size > MAX_IN_BUF_SIZE) {
-			pr_err_ratelimited("diag: In %s, SMD sending packet of %d bytes that may expand to %d bytes, peripheral: %d\n",
-				__func__, total_recd, max_size,
-				smd_info->peripheral);
-			max_size = MAX_IN_BUF_SIZE;
-		}
-		if (buf == smd_info->buf_in_1_raw) {
-			/* Only realloc if we need to increase the size */
-			if (smd_info->usb_buf_in_1_size < max_size) {
-				temp_buf = krealloc(smd_info->buf_in_1,
-					max_size, GFP_KERNEL);
-				if (temp_buf) {
-					smd_info->usb_buf_in_1 = temp_buf;
-					smd_info->usb_buf_in_1_size = max_size;
-				}
-			}
-			buf_size = smd_info->usb_buf_in_1_size;
-		} else {
-			/* Only realloc if we need to increase the size */
-			if (smd_info->usb_buf_in_2_size < max_size) {
-				temp_buf = krealloc(smd_info->buf_in_2,
-					max_size, GFP_KERNEL);
-				if (temp_buf) {
-					smd_info->usb_buf_in_2 = temp_buf;
-					smd_info->usb_buf_in_2_size = max_size;
-				}
-			}
-			buf_size = smd_info->usb_buf_in_2_size;
-		}
-	}
-
-	return buf_size;
-}
-
-
-/*
- * define packet type, pakcet type is the fist byte of the packet
- * 0x10, //16,  DIAG_LOG_F                ==> to host, equipment may need this log
- * 0x60, //96,  DIAG_EVENT_REPORT_F       ==> not to host, equipment do not want this
- * 0x79, //121, DIAG_EXT_MSG_F            ==> not to host, msg is too much, equipment do not want this
- * 0x7e, //126, DIAG_EXT_MSG_TERSE_F      ==> not to host, equipment do not want this
- * 0x92, //146, DIAG_QSR_EXT_MSG_TERSE_F  ==> not to host, equipment do not want this
- */
-#define DIAG_LOG_F               0x10
-#define DIAG_EVENT_REPORT_F      0x60
-#define DIAG_EXT_MSG_F           0x79
-#define DIAG_EXT_MSG_TERSE_F     0x7e
-#define DIAG_QSR_EXT_MSG_TERSE_F 0x92
-
-static char log_msg_event[]=
-{
-	DIAG_EVENT_REPORT_F,
-	DIAG_EXT_MSG_F,
-	DIAG_EXT_MSG_TERSE_F,
-	DIAG_QSR_EXT_MSG_TERSE_F
-};
-
-#define PACKET_PYTE_COUNT sizeof(log_msg_event)/sizeof(char)
-
-/*
- * head struct of 0x10 log packet
- * 10 00 0f 00  0f 00 7c 11  00 00 41 b3  01 00 00 00  05 10 00 76  47 7e
- * in the above log packet, the head is 0f 00 7c 11
- * the len is 0x000f
- * the code is 0x117c, including equip_id(bit15) and item(bit14-0)
-*/
-struct log_header_type
-{
-  /* Specifies the length, in bytes of the entry, including this header. */
-  uint16_t len;
-
-  /* Specifies the log code for the entry as enumerated above. */
-  uint16_t code;
-} ;
-
-/*
- * 0x117c --> LOG_FTM_VER_2_C  (0x17C + LOG_1X_BASE_C)
- * 0x119c --> LOG_SEARCHER_RESERVED_CODES_BASE_C  (0x19A + LOG_1X_BASE_C)
- * 0x10d9 --> LOG_RDA_FRAME_INFO_2_C  (0xD9 + LOG_1X_BASE_C)
- * 0x10c9 --> LOG_RDA_FRAME_INFO_C  (0xC9 + LOG_1X_BASE_C)
- */
-#define CBT_LOG_CODE1 0x117c
-#define CBT_LOG_CODE2 0x119c
-#define CBT_LOG_CODE3 0x10d9
-#define CBT_LOG_CODE4 0x10c9
-
-/*
- * payload points to the first byte of one packet
- */
-static int is_host_need_packet(uint8_t *payload)
-{
-    int i = 0;
-    uint16_t code = 0;
-    char packet_type = *(char *)payload;
-
-    if(packet_type == DIAG_LOG_F)
-    {
-        code = ((struct log_header_type *)(payload+4))->code;
-        if((code == CBT_LOG_CODE1) || (code == CBT_LOG_CODE2)
-            || (code == CBT_LOG_CODE3) || (code == CBT_LOG_CODE4))
-        {
-            /*to host, equipment wants */
-            return 1;
-        }
-        else
-        {
-            /* not to host, equipment does not want */
-            return 0;
-        }
-    }
-
-
-    for(i = 0; i<PACKET_PYTE_COUNT; i++)
-    {
-        if (packet_type == log_msg_event[i])
-        {
-            /* not to host, equipment does not want */
-            return 0;
-        }
-    }
-
-    return 1;
-}
-
-
-int select_for_host_and_encoding(struct diag_smd_info *smd_info, void *buf,
-			   int total_recd, uint8_t *encode_buf,
-			   int *encoded_length)
-{
-	struct diag_send_desc_type send = { NULL, NULL, DIAG_STATE_START, 0 };
-	struct diag_hdlc_dest_type enc = { NULL, NULL, 0 };
-	struct data_header {
-		uint8_t control_char;
-		uint8_t version;
-		uint16_t length;
-	};
-	struct data_header *header;
-	int header_size = sizeof(struct data_header);
-	uint8_t *end_control_char;
-	uint8_t *payload;
-	uint8_t *temp_buf;
-	uint8_t *temp_encode_buf;
-	int src_pkt_len;
-	int encoded_pkt_length;
-	int max_size;
-	int total_processed = 0;
-	int bytes_remaining;
-	int success = 1;
-
-	temp_buf = buf;
-	temp_encode_buf = encode_buf;
-	bytes_remaining = *encoded_length;
-	while (total_processed < total_recd) {
-		header = (struct data_header *)temp_buf;
-		/* Perform initial error checking */
-		if (header->control_char != CONTROL_CHAR ||
-			header->version != 1) {
-			success = 0;
-			break;
-		}
-		payload = temp_buf + header_size;
-		end_control_char = payload + header->length;
-		if (*end_control_char != CONTROL_CHAR) {
-			success = 0;
-			break;
-		}
-
-		max_size = 2 * header->length + 3;
-		if (bytes_remaining < max_size) {
-			pr_err("diag: In %s, Not enough room to encode remaining data for peripheral: %d, bytes available: %d, max_size: %d\n",
-				__func__, smd_info->peripheral,
-				bytes_remaining, max_size);
-			success = 0;
-			break;
-		}
-
-		/* just encode the the packet that the host needs */
-		if(is_host_need_packet(payload))
-		{
-		    /* Prepare for encoding the data */
-		    send.state = DIAG_STATE_START;
-		    send.pkt = payload;
-		    send.last = (void *)(payload + header->length - 1);
-		    send.terminate = 1;
-
-		    enc.dest = temp_encode_buf;
-		    enc.dest_last = (void *)(temp_encode_buf + max_size);
-		    enc.crc = 0;
-		    diag_hdlc_encode(&send, &enc);
-
-		    encoded_pkt_length = (uint8_t *)enc.dest - temp_encode_buf;
-		    temp_encode_buf = enc.dest;
-		    bytes_remaining -= encoded_pkt_length;
-		}
-
-		/* Prepare for next packet */
-		src_pkt_len = (header_size + header->length + 1);
-		total_processed += src_pkt_len;
-		temp_buf += src_pkt_len;
-	}
-
-	*encoded_length = (int)(temp_encode_buf - encode_buf);
-
-	return success;
-}
-#endif
-
-
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
 int diag_wakeup_qxmdlog_proc(void)
 {
 	int i = 0;
@@ -587,9 +370,6 @@ int diag_process_smd_read_data(struct diag_smd_info *smd_info, void *buf,
 #endif
 	int err = 0;
 	unsigned long flags;
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-	struct diag_request *usb_write_ptr_modem = NULL;
-#endif
 
 	/*
 	 * Do not process data on command channel if the
@@ -663,7 +443,6 @@ int diag_process_smd_read_data(struct diag_smd_info *smd_info, void *buf,
 			write_ptr_modem = smd_info->write_ptr_1;
 			in_busy_ptr = &smd_info->in_busy_1;
 #ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-			usb_write_ptr_modem = smd_info->usb_write_ptr_1;
 			in_busy_usb_ptr = &smd_info->in_busy_usb_1;
 			in_busy_file_ptr = &smd_info->in_busy_file_1;
 #endif
@@ -671,7 +450,6 @@ int diag_process_smd_read_data(struct diag_smd_info *smd_info, void *buf,
 			write_ptr_modem = smd_info->write_ptr_2;
 			in_busy_ptr = &smd_info->in_busy_2;
 #ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-			usb_write_ptr_modem = smd_info->usb_write_ptr_2;
 			in_busy_usb_ptr = &smd_info->in_busy_usb_2;
 			in_busy_file_ptr = &smd_info->in_busy_file_2;
 #endif
@@ -684,10 +462,6 @@ int diag_process_smd_read_data(struct diag_smd_info *smd_info, void *buf,
 			int success = 0;
 			int write_length = 0;
 			unsigned char *write_buf = NULL;
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-            int usb_write_length = 0;
-            unsigned char *usb_write_buf = NULL;
-#endif
 
 			write_length = check_bufsize_for_encoding(smd_info, buf,
 								total_recd);
@@ -697,31 +471,6 @@ int diag_process_smd_read_data(struct diag_smd_info *smd_info, void *buf,
 				success = diag_add_hdlc_encoding(smd_info, buf,
 							total_recd, write_buf,
 							&write_length);
-
-                 /* if mixed_qmdlog_flag is false,
-				  * USB_MODE, diag cmd and data both to usb, use write_buf
-				  *	MEMORY_DEVICE_MODE, diag cmd and data both to usb, use write_buf
-				  *	if mixed_qmdlog_flag is true,
-				  * cmd to usb, use write_buf
-				  * all the data to sdcad, use write_buf
-				  * some data also to usb, use usb_write_buf 
-				  */				 
- #ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
- 				 /* 
-				  * there may be many packets in the raw buffer, 
-				  * select the packets that host needs, and encode them to usb buf
-				  */
-				if(success && driver->mixed_qmdlog_flag && driver->usb_connected && (SMD_DATA_TYPE== smd_info->type)){
-                    usb_write_length = check_usb_bufsize_for_encoding(smd_info, buf,
-                                        total_recd);
-                    usb_write_buf = (buf == smd_info->buf_in_1_raw) ?
-                        smd_info->usb_buf_in_1 : smd_info->usb_buf_in_2;
-				    select_for_host_and_encoding(smd_info, buf,
-							total_recd, usb_write_buf,
-							&usb_write_length);
-				}
-#endif
-
 				spin_lock_irqsave(&smd_info->in_busy_lock,
 						  flags);
 				if (success) {
@@ -729,50 +478,19 @@ int diag_process_smd_read_data(struct diag_smd_info *smd_info, void *buf,
 					*in_busy_ptr = 1;
 
 #ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-					if(driver->mixed_qmdlog_flag && (SMD_DATA_TYPE== smd_info->type)){
-
+					/* as the before not hdlc case*/
+					if(driver->mixed_qmdlog_flag){
 						if(driver->usb_connected){
+							*in_busy_usb_ptr = 1;
 							*in_busy_file_ptr = 1;
 						}
-
-                        if(usb_write_length){
-                            usb_write_ptr_modem->length = usb_write_length;
-                            *in_busy_usb_ptr = 1;
-                        } else {
-                            *in_busy_usb_ptr = 0;
-                        }
-
-						/* to sdcard, use write_buf */
 						err = diag_wakeup_qxmdlog_proc();
 						if(err){
 							pr_err("diag_process_smd_read_data: diag_wakeup_qxmdlog_proc: err: %d\n", err);
 						}
-
-                        /* also to usb, use usb_write_buf */
-						if(usb_write_length){
-                            err = diag_device_write(usb_write_buf,
-                                    smd_info->peripheral,
-                                    usb_write_ptr_modem);
-                            if (err) {
-                                pr_err_ratelimited("diag: In %s, diag_device_write error: %d\n",
-                                        __func__, err);
-                            }
-						}
-					/*
-					 * if mixed_qmdlog_flag is false, 
-					 * or mixed_qmdlog_flag is true but smd type is SMD_CMD_TYPE,
-					 * run the original code, data and cmd both to usb, use write_buf
-					 */
-					}else {
-					    err = diag_device_write(write_buf,
-    							smd_info->peripheral,
-    							write_ptr_modem);
-					    if (err) {
-    						pr_err_ratelimited("diag: In %s, diag_device_write error: %d\n",
-    								__func__, err);
-    					}
 					}
-#else
+#endif
+
 					err = diag_device_write(write_buf,
 							smd_info->peripheral,
 							write_ptr_modem);
@@ -780,7 +498,6 @@ int diag_process_smd_read_data(struct diag_smd_info *smd_info, void *buf,
 						pr_err_ratelimited("diag: In %s, diag_device_write error: %d\n",
 								__func__, err);
 					}
-#endif
 				}
 				spin_unlock_irqrestore(&smd_info->in_busy_lock,
 						       flags);
@@ -1022,11 +739,7 @@ void diag_smd_send_req(struct diag_smd_info *smd_info)
 			}
 		}
 
-		if (smd_info->type == SMD_CMD_TYPE
-				&& !driver->usb_connected
-				&& driver->logging_mode == MEMORY_DEVICE_MODE)
-						continue;
-		if ((smd_info->type != SMD_CNTL_TYPE) || buf_full)
+		if (smd_info->type != SMD_CNTL_TYPE || buf_full)
 			break;
 
 		}
@@ -1656,7 +1369,7 @@ int diag_process_apps_pkt(unsigned char *buf, int len)
 			{
 				if ((entry.cmd_code_lo <= subsys_id) && (entry.cmd_code_hi >= subsys_id))
 				{
-					if( !(diag_send_data(entry, buf, len,data_type)) )
+					if( diag_send_data(entry, buf, len,data_type) )
 					{
 						pr_err("%s: diag send data failed\n",__func__);
 					}
@@ -2385,49 +2098,46 @@ static int diagfwd_check_buf_match(int num_channels,
 	unsigned long flags;
 
 	spin_lock_irqsave(&data->in_busy_lock, flags);
-    	for (i = 0; i < num_channels; i++) {
+	for (i = 0; i < num_channels; i++) {
+		if (buf == (void *)data[i].buf_in_1) {
 #ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-        if (driver->mixed_qmdlog_flag) {
-            if (buf == (void *)data[i].buf_in_1 || buf == (void *)data[i].usb_buf_in_1) {
+			if (driver->mixed_qmdlog_flag)
+			{
 				data[i].in_busy_usb_1 = 0;
 				if(!data[i].in_busy_file_1)
 				{
 					data[i].in_busy_1 = 0;
 				}
-                found_it = 1;
-                break;
-            } else if (buf == (void *)data[i].buf_in_2 || buf == (void *)data[i].usb_buf_in_2) {
+			}
+			else
+			{
+				data[i].in_busy_1 = 0;
+			}
+#else
+			data[i].in_busy_1 = 0;
+#endif
+			found_it = 1;
+			break;
+		} else if (buf == (void *)data[i].buf_in_2) {
+#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
+			if (driver->mixed_qmdlog_flag)
+			{
 				data[i].in_busy_usb_2 = 0;
 				if(!data[i].in_busy_file_2)
 				{
 					data[i].in_busy_2 = 0;
 				}
-                found_it = 1;
-                break;
-            }
-        }else{
-    		if (buf == (void *)data[i].buf_in_1) {
-    			data[i].in_busy_1 = 0;
-    			found_it = 1;
-    			break;
-    		} else if (buf == (void *)data[i].buf_in_2) {
-    			data[i].in_busy_2 = 0;
-    			found_it = 1;
-    			break;
-    		} 
-        }
+			}
+			else
+			{
+				data[i].in_busy_2 = 0;
+			}
 #else
-		if (buf == (void *)data[i].buf_in_1) {
-			data[i].in_busy_1 = 0;
-			found_it = 1;
-			break;
-		} else if (buf == (void *)data[i].buf_in_2) {
 			data[i].in_busy_2 = 0;
+#endif
 			found_it = 1;
 			break;
 		}
-
-#endif		
 	}
 	spin_unlock_irqrestore(&data->in_busy_lock, flags);
 
@@ -2751,14 +2461,6 @@ void diag_smd_destructor(struct diag_smd_info *smd_info)
 	kfree(smd_info->write_ptr_2);
 	kfree(smd_info->buf_in_1_raw);
 	kfree(smd_info->buf_in_2_raw);
-
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-    kfree(smd_info->usb_buf_in_1);
-    kfree(smd_info->usb_buf_in_2);
-    kfree(smd_info->usb_write_ptr_1);
-    kfree(smd_info->usb_write_ptr_2);
-#endif
-	
 }
 
 void diag_smd_buffer_init(struct diag_smd_info *smd_info)
@@ -2826,44 +2528,6 @@ void diag_smd_buffer_init(struct diag_smd_info *smd_info)
 				kmemleak_not_leak(smd_info->buf_in_2_raw);
 			}
 		}
-
-		
-		/* alloce usb buffer fom SMD_DATA_TYPE */
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-            if (smd_info->usb_buf_in_1 == NULL) {
-                smd_info->usb_buf_in_1 = kzalloc(IN_BUF_SIZE, GFP_KERNEL);
-                if (smd_info->usb_buf_in_1 == NULL)
-                    goto err;
-                smd_info->usb_buf_in_1_size = IN_BUF_SIZE;
-                kmemleak_not_leak(smd_info->usb_buf_in_1);
-            }
-    
-            if (smd_info->usb_buf_in_2 == NULL) {
-                smd_info->usb_buf_in_2 = kzalloc(IN_BUF_SIZE, GFP_KERNEL);
-                if (smd_info->usb_buf_in_2 == NULL)
-                    goto err;
-                smd_info->usb_buf_in_2_size = IN_BUF_SIZE;
-                kmemleak_not_leak(smd_info->usb_buf_in_2);
-            }
-            
-            if (smd_info->usb_write_ptr_1 == NULL) {
-                smd_info->usb_write_ptr_1 = kzalloc(sizeof(struct diag_request),
-                                        GFP_KERNEL);
-                if (smd_info->usb_write_ptr_1 == NULL)
-                    goto err;
-                kmemleak_not_leak(smd_info->usb_write_ptr_1);
-            }
-            
-            if (smd_info->usb_write_ptr_2 == NULL) {
-                smd_info->usb_write_ptr_2 =
-                    kzalloc(sizeof(struct diag_request),
-                    GFP_KERNEL);
-                if (smd_info->usb_write_ptr_2 == NULL)
-                    goto err;
-                kmemleak_not_leak(smd_info->usb_write_ptr_2);
-            }
-#endif
-                
 	}
 
 	if (smd_info->type == SMD_CMD_TYPE &&
@@ -2888,13 +2552,6 @@ err:
 	kfree(smd_info->write_ptr_2);
 	kfree(smd_info->buf_in_1_raw);
 	kfree(smd_info->buf_in_2_raw);
-
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-	kfree(smd_info->usb_buf_in_1);
-	kfree(smd_info->usb_buf_in_2);
-    kfree(smd_info->usb_write_ptr_1);
-    kfree(smd_info->usb_write_ptr_2);
-#endif
 }
 
 int diag_smd_constructor(struct diag_smd_info *smd_info, int peripheral,

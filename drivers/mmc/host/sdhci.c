@@ -1169,9 +1169,6 @@ static void sdhci_finish_data(struct sdhci_host *host)
 }
 
 #define SDHCI_REQUEST_TIMEOUT	10 /* Default request timeout in seconds */
-#ifdef CONFIG_HUAWEI_KERNEL
-#define SDHCI_REQUEST_SD_TIMEOUT	3
-#endif
 
 static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 {
@@ -1206,28 +1203,11 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 		mdelay(1);
 	}
 
-	/*for SD card we change the timeout time from 10s to 3s,which can improve suspending slowly.*/
-#ifdef CONFIG_HUAWEI_KERNEL
-	if(!strcmp(mmc_hostname(host->mmc), "mmc1")) {
-		mod_timer(&host->timer, jiffies + SDHCI_REQUEST_SD_TIMEOUT * HZ);
-		if (cmd->cmd_timeout_ms > SDHCI_REQUEST_SD_TIMEOUT * MSEC_PER_SEC)
-			mod_timer(&host->timer, jiffies +
-					(msecs_to_jiffies(cmd->cmd_timeout_ms * 2)));
-
-	} else {
-		mod_timer(&host->timer, jiffies + SDHCI_REQUEST_TIMEOUT * HZ);
-		if (cmd->cmd_timeout_ms > SDHCI_REQUEST_TIMEOUT * MSEC_PER_SEC)
-			mod_timer(&host->timer, jiffies +
-					(msecs_to_jiffies(cmd->cmd_timeout_ms * 2)));
-
-	}
-#else
 	mod_timer(&host->timer, jiffies + SDHCI_REQUEST_TIMEOUT * HZ);
 
 	if (cmd->cmd_timeout_ms > SDHCI_REQUEST_TIMEOUT * MSEC_PER_SEC)
 		mod_timer(&host->timer, jiffies +
 				(msecs_to_jiffies(cmd->cmd_timeout_ms * 2)));
-#endif
 
 	host->cmd = cmd;
 

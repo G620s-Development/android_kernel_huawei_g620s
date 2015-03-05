@@ -16,7 +16,7 @@ qcom,qrd-4v35-3000mAh-clt-data {
 	qcom,rbatt-capacitive-mohm = <50>;
 	qcom,flat-ocv-threshold-uv = <3800000>;
 	qcom,max-voltage-uv = <4350000>;
-	qcom,v-cutoff-uv = <3300000>;
+	qcom,v-cutoff-uv = <3400000>;
 	qcom,chg-term-ua = <100000>;
 	qcom,batt-id-kohm = <22>;
 	qcom,battery-type = "HB4342B4EBW_CLT_GY";
@@ -122,9 +122,9 @@ qcom,qrd-4v35-3000mAh-clt-data {
 	qcom,ibat-acc-lut {
 		qcom,lut-col-legend = <(-20) 0 25>;
 		qcom,lut-row-legend = <0 250 500 1000>;
-		qcom,lut-data = <3019 3026 3028>,
-				<1748 2998 3015>,
-				<1122 2921 3003>,
-				<132 2580 2980>;
+		qcom,lut-data = <2989 2996 2996>,
+				<1182 2968 2992>,
+				<654 2859 2976>,
+				<54 2246 2944>;
 };
 };

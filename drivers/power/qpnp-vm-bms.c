@@ -207,8 +207,6 @@ struct bms_dt_cfg {
 	int				cfg_s3_ocv_tol_uv;
 #ifdef CONFIG_HUAWEI_KERNEL
 	int				cfg_resume_soc;
-    int             cfg_hw_cut_off_voltage_uv;
-    int             cfg_hw_protect_voltage_uv;
 #endif
 };
 
@@ -2038,13 +2036,6 @@ static int __init early_parse_factory_flag(char * p)
 }
 early_param("androidboot.huawei_swtype",early_parse_factory_flag);
 
-#ifdef CONFIG_HUAWEI_KERNEL
-bool is_sw_factory_mode(void)
-{
-	return factory_flag;
-}
-EXPORT_SYMBOL(is_sw_factory_mode);
-#endif
 #define HW_PROTECT_VOLTAGE_UV 3350000
 
 #define HW_MAX_BAD_VOLTAGE_COUNT 10
@@ -2141,7 +2132,7 @@ int hw_discharge_voltage_check(struct qpnp_bms_chip *chip,int soc,int vbat_uv,in
 	/* if store value is lower_than 3,just simple deal with it */
 	if(chip->vbat_sample_num < CONTINUOUS_SAMPLING_3_TIMES)
 	{
-		if(vbat_uv >= chip->dt.cfg_hw_cut_off_voltage_uv + CUTOFF_VOLTAGE_DELTA_UV && soc <= CUTOFF_BATTERY_LEVEL )
+		if(vbat_uv >= CUTOFF_VOLTAGE_UV + CUTOFF_VOLTAGE_DELTA_UV && soc <= CUTOFF_BATTERY_LEVEL )
 		{
 			soc = CUTOFF_BATTERY_LEVEL+1;
 		}
@@ -2159,7 +2150,7 @@ int hw_discharge_voltage_check(struct qpnp_bms_chip *chip,int soc,int vbat_uv,in
 		/* check recently three vbat samples in succession */
 		for(i=0;i<CONTINUOUS_SAMPLING_3_TIMES;i++)
 		{
-			if(chip->vbat_store_mv[j] >= chip->dt.cfg_hw_cut_off_voltage_uv + CUTOFF_VOLTAGE_DELTA_UV)
+			if(chip->vbat_store_mv[j] >= CUTOFF_VOLTAGE_UV + CUTOFF_VOLTAGE_DELTA_UV)
 			{
 				break;
 			}
@@ -2175,7 +2166,7 @@ int hw_discharge_voltage_check(struct qpnp_bms_chip *chip,int soc,int vbat_uv,in
 
 		/* if average of vbat is lower than cutoff voltage and recently three voltage is lower than cutoff
 			low_voltage_flag will be modfy true */
-		if(CONTINUOUS_SAMPLING_3_TIMES == i && vavg_mv < chip->dt.cfg_hw_cut_off_voltage_uv + CUTOFF_VOLTAGE_DELTA_UV)
+		if(CONTINUOUS_SAMPLING_3_TIMES == i && vavg_mv < CUTOFF_VOLTAGE_UV + CUTOFF_VOLTAGE_DELTA_UV)
 		{
 			low_voltage_flag = 1;
 		}
@@ -2286,7 +2277,7 @@ int hw_protect_voltage_check(struct qpnp_bms_chip *chip,int soc,int sample_count
 		return soc ;
 	}
 	
-	if(vbat_uv < chip->dt.cfg_hw_protect_voltage_uv)
+	if(vbat_uv < HW_PROTECT_VOLTAGE_UV)
 	{
 		bad_voltage_count = min((bad_voltage_count + 1),HW_MAX_BAD_VOLTAGE_COUNT );
 	}
@@ -4107,8 +4098,6 @@ static int parse_bms_dt_properties(struct qpnp_bms_chip *chip)
 			"volatge-soc-timeout-ms", rc);
 #ifdef CONFIG_HUAWEI_KERNEL
 	SPMI_PROP_READ(cfg_resume_soc, "resume-soc", rc);
-	SPMI_PROP_READ(cfg_hw_cut_off_voltage_uv, "cfg_hw_cut_off_voltage_uv", rc);
-	SPMI_PROP_READ(cfg_hw_protect_voltage_uv, "cfg_hw_protect_voltage_uv", rc);
 #endif
 
 	if (rc) {

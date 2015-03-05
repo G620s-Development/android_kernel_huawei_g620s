@@ -11,26 +11,6 @@
 #define ELPIDA_ID     3
 #define HYNIX_ID     6
 
-#define DDR_SIZE_ORDER_MAX 35   //32Gbit , 4GB
-#define DDR_SIZE_ORDER_MIN 30   //1Gbit,125MB 
-#define DDR_SIZE_MAX (0x1<<(DDR_SIZE_ORDER_MAX - 30))
-#define DDR_SIZE_MIN (0x1<<(DDR_SIZE_ORDER_MIN - 30))
-
-/** DDR types. */
-typedef enum
-{
-  DDR_TYPE_LPDDR1,           /**< Low power DDR1. */
-  DDR_TYPE_LPDDR2 = 2,       /**< Low power DDR2  set to 2 for compatibility*/
-  DDR_TYPE_PCDDR2,           /**< Personal computer DDR2. */
-  DDR_TYPE_PCDDR3,           /**< Personal computer DDR3. */
-  
-  DDR_TYPE_LPDDR3,           /**< Low power DDR3. */  
-  
-  DDR_TYPE_RESERVED,         /**< Reserved for future use. */
-  DDR_TYPE_UNUSED = 0x7FFFFFFF  /**< For compatibility with deviceprogrammer(features not using DDR). */
-} DDR_TYPE;
-
-
 struct info_node
 {
     char name[APP_INFO_NAME_LENTH];
@@ -99,15 +79,12 @@ static const struct file_operations app_info_proc_fops =
 /*
     Function to read the SMEM to get the lpDDR name
 */
-void export_ddr_info(unsigned int ddr_vendor_id,unsigned int ddr_size, unsigned int ddr_type )
+void export_ddr_name(unsigned int ddr_vendor_id)
 {
-    char ddr_info_all[APP_INFO_VALUE_LENTH];
-    char *ddr_info = NULL;
+    char * ddr_info = NULL;
     char *SAMSUNG_DDR = "SAMSUNG";
     char *ELPIDA_DDR = "ELPIDA";
     char *HYNIX_DDR  = "HYNIX";
-    char ddr_size_info[8];
-    char *ddr_type_info;
 
      switch (ddr_vendor_id)
      {
@@ -132,52 +109,23 @@ void export_ddr_info(unsigned int ddr_vendor_id,unsigned int ddr_size, unsigned 
             break;
         }
      }
-     
-     if( ddr_size >= DDR_SIZE_MIN && ddr_size <=DDR_SIZE_MAX ) //should be less than 4G
-     {
-         snprintf( ddr_size_info, 8, "%dGbit", ddr_size );
-     }
-     else
-     {
-         snprintf( ddr_size_info , 8 , "UNKNOWN" );
-     }
 
-     switch(ddr_type)
-     {
-         case DDR_TYPE_LPDDR1:
-             ddr_type_info = "LPDDR1";
-             break;
-         case DDR_TYPE_LPDDR2:
-             ddr_type_info = "LPDDR2";
-             break;
-         case DDR_TYPE_LPDDR3:
-             ddr_type_info = "LPDDR3"; 
-             break;
-         default:
-             ddr_type_info = "UNKNOWN";
-             break;
-     }
-
-     snprintf(ddr_info_all,APP_INFO_VALUE_LENTH-1, "%s %s %s", ddr_info,ddr_size_info,ddr_type_info );
- 
     /* Set the vendor name in app_info */
-    if (app_info_set("ddr_vendor", ddr_info_all))
-        pr_err("Error setting DDR vendor info\n");
+    if (app_info_set("ddr_vendor", ddr_info))
+        pr_err("Error setting DDR vendor name\n");
 
     /* Print the DDR Name in the kmsg log */
-    pr_err("DDR VENDOR is : %s", ddr_info_all);
+    pr_err("DDR VENDOR NAME is : %s", ddr_info);
 
     return;
 }
+
 
 void app_info_print_smem(void)
 {
     unsigned int ddr_vendor_id = 0;
     /* read share memory and get DDR ID */
     smem_exten_huawei_paramater *smem = NULL;
-    unsigned int ddr_size0,ddr_size1;
-    unsigned int ddr_size=0;
-    unsigned int ddr_type;
 
     smem = smem_alloc(SMEM_ID_VENDOR1, sizeof(smem_exten_huawei_paramater),
 						  0,
@@ -194,25 +142,11 @@ void app_info_print_smem(void)
 
     ddr_vendor_id = smem->lpddrID;
     ddr_vendor_id &= 0xff;
-    
-    ddr_size1 = ( smem->lpddrID >> 8 ) & 0xFF;
-    ddr_size0 = ( smem->lpddrID >> 16 ) & 0xFF;
-    
-    if(ddr_size0<= DDR_SIZE_ORDER_MAX && ddr_size0>= DDR_SIZE_ORDER_MIN ) 
-        ddr_size = 0x1<<(ddr_size0-30);
 
-    if(ddr_size1<= DDR_SIZE_ORDER_MAX && ddr_size0>= DDR_SIZE_ORDER_MIN )
-        ddr_size += 0x1<<(ddr_size1-30);
-
-    ddr_type = ( smem->lpddrID >> 24 ) & 0xFF;
-    
-    printk(KERN_ERR "ddr_info %x,%d,%d,%d", smem->lpddrID,ddr_size1,ddr_size0, ddr_size );
-
-    export_ddr_info(ddr_vendor_id, ddr_size, ddr_type );
+    export_ddr_name(ddr_vendor_id);
 
     return;
 }
-
 static int __init proc_app_info_init(void)
 {
     proc_create("app_info", 0, NULL, &app_info_proc_fops);

@@ -691,13 +691,6 @@ struct sensor_init_cfg_data {
 	} cfg;
 };
 
-struct msm_sensor_afc_otp_info
-{
-    uint16_t starting_dac;
-	uint16_t infinity_dac;
-	uint16_t macro_dac;
-};
-
 #define VIDIOC_MSM_SENSOR_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 1, struct sensorb_cfg_data)
 
@@ -727,9 +720,6 @@ struct msm_sensor_afc_otp_info
 
 #define VIDIOC_MSM_SENSOR_INIT_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 10, struct sensor_init_cfg_data)
-
-#define VIDIOC_MSM_SENSOR_GET_AFC_OTP_INFO \
-	_IOWR('V', BASE_VIDIOC_PRIVATE + 11, struct msm_sensor_afc_otp_info)
 
 #define MSM_V4L2_PIX_FMT_META v4l2_fourcc('M', 'E', 'T', 'A') /* META */
 

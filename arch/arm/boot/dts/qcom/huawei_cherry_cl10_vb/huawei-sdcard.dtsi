@@ -1,1 +1,10 @@
-/* remove the function of UHS as the vdd can't power cycle when SD card is pluged */
+&soc {		
+		huawei,huawei-supply-uhsi {
+                compatible = "huawei,huawei-supply-uhsi";         
+	};	
+};
+
+&sdhc_2 {	
+	/*modify it for surport 3.0 sdcard for cherry*/
+	qcom,vdd-io-voltage-level = <1800000 2950000>;	
+};

@@ -26,16 +26,7 @@ static void s2log(int code, const char*msg) {
         level = (char)LEVEL_A;
     else
         level = (char)LEVEL_C;
-
-    if((code & CHARGE_ERROR_BASE) == CHARGE_ERROR_BASE)
-    {
-        level = (char)LEVEL_A;
-        write_log_to_exception(CHARGE_ID, level, msg);
-    }
-    else
-    {
-        write_log_to_exception(STORAGE_ID, level, msg);
-    }
+    write_log_to_exception(STORAGE_ID, level, msg);
 }
 
 static long get_time(void) {

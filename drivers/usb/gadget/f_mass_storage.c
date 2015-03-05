@@ -231,11 +231,8 @@ static const char fsg_string_interface[] = "Mass Storage";
 #include "storage_common.c"
 
 #ifdef CONFIG_HUAWEI_USB
-#define SUITESTATE_INIT_VALUE       0xff
-#define SUITESTATE_LEN              1
 static int nluns = USB_MAX_LUNS;
 static int cdrom_index = 0;
-static int suitestate = SUITESTATE_INIT_VALUE;
 #endif
 
 #ifdef CONFIG_USB_CSW_HACK
@@ -1203,7 +1200,9 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 		buf[4] = 31;		/* Additional length */
 		return 36;
 	}
-    /* curlun->cdrom is already set */
+#ifdef CONFIG_HUAWEI_USB
+    curlun->cdrom = (common->lun == cdrom_index)? 1 : 0;
+#endif
 
 	buf[0] = curlun->cdrom ? TYPE_ROM : TYPE_DISK;
 	buf[1] = curlun->removable ? 0x80 : 0;
@@ -2126,14 +2125,6 @@ static int check_command(struct fsg_common *common, int cmnd_size,
 
 	return 0;
 }
-#ifdef CONFIG_HUAWEI_USB
-static int do_get_suitestate(struct fsg_common *common, struct fsg_buffhd *bh)
-{
-    u8 *buf = (u8* )bh->buf;
-    buf[0] = suitestate;
-    return SUITESTATE_LEN;
-}
-#endif
 
 /* wrapper of check_command for data size in blocks handling */
 static int check_command_size_in_blocks(struct fsg_common *common,
@@ -2184,18 +2175,6 @@ static int do_scsi_command(struct fsg_common *common)
 		if (reply == 0)
 			reply = do_inquiry(common, bh);
 		break;
-#ifdef CONFIG_HUAWEI_USB
-	/* deal with the scsi command from Hisuite on the PC */
-    case SEEK_6:
-        common->data_size_from_cmnd = 1;
-        if(common->cmnd[1] == 0x01 && common->curlun->cdrom == 1)
-        {
-            reply = do_get_suitestate(common, bh);
-        }
-        common->residue = reply;
-        common->usb_amount_left = reply;
-        break;
-#endif
 
 	case MODE_SELECT:
 		common->data_size_from_cmnd = common->cmnd[4];

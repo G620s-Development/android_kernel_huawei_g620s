@@ -177,8 +177,7 @@ typedef struct
 #ifdef  CONFIG_HUAWEI_KERNEL
     unsigned int pwrkpd_reset;
 #endif
-    unsigned int ddr_scan_status; //modify for ddr scan
-
+    unsigned int reserved;                  /* reserved for filling */
 }smem_exten_huawei_paramater;
 #ifdef CONFIG_MSM_SMEM
 void *smem_alloc(unsigned id, unsigned size_in, unsigned to_proc,

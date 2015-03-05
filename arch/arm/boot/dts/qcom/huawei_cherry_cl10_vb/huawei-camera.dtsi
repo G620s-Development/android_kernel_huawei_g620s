@@ -10,12 +10,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
-&flash_lm3642{
-
-      qcom,flash-high-current = <7>;/* 750mA */
-
-};
 &cci {
 	actuator0: qcom,actuator@6e {
 		cell-index = <3>;
@@ -92,21 +86,18 @@
 				<&msm_gpio 28 0>,
 				<&msm_gpio 33 0>,
 				<&msm_gpio 114 0>,
-				<&msm_gpio 110 0>,
-				<&msm_gpio 52 0>;
+				<&msm_gpio 110 0>;
 		qcom,gpio-reset = <1>;
 		qcom,gpio-standby = <2>;
 		qcom,gpio-vdig = <3>;
 		qcom,gpio-vana = <4>;
-		qcom,gpio-cam-id = <5>;
-		qcom,gpio-req-tbl-num = <0 1 2 3 4 5>;
-		qcom,gpio-req-tbl-flags = <1 0 0 0 0 1>;
+		qcom,gpio-req-tbl-num = <0 1 2 3 4>;
+		qcom,gpio-req-tbl-flags = <1 0 0 0 0>;
 		qcom,gpio-req-tbl-label = "CAMIF_MCLK",
 				"CAM_RESET",
 				"CAM_STANDBY",
 				"CAM_VDIG",
-				"CAM_VANA",
-				"CAM_CAM_ID";
+				"CAM_VANA";
 		qcom,sensor-position = <1>;
 		qcom,sensor-mode = <0>;
 		qcom,cci-master = <0>;

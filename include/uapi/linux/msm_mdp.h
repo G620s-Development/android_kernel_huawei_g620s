@@ -637,6 +637,7 @@ struct mdp_overlay {
 	uint32_t bg_color;
 	uint8_t horz_deci;
 	uint8_t vert_deci;
+	uint8_t src_alpha_drop;
 	struct mdp_overlay_pp_params overlay_pp_cfg;
 	struct mdp_scale_data scale;
 };
@@ -1089,10 +1090,11 @@ struct mdp_page_protection {
 	uint32_t page_protection;
 };
 
+
 #ifdef CONFIG_HUAWEI_LCD
 enum inversion_mode {
-	COLUMN_INVERSION = 0,
-	DOT_INVERSION = 2,
+	COLUMN_INVERSION,
+	DOT_INVERSION,
 };
 #endif
 

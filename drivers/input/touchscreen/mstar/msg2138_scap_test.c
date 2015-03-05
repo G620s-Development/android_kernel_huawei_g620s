@@ -13,21 +13,19 @@
 
 static struct mutex scap_test_mutex;
 
+
+
 extern struct dsm_client * tp_dclient;
-extern struct msg21xx_ts_data *msg21xx_data;
 
-extern struct i2c_client *msg21xx_i2c_client;
+extern struct msg21xx_ts_data * msg21xx_data;
 
+extern struct i2c_client *g_i2c_client;
 extern unsigned int g_focal_rst_gpio;
-#define READREG_RETRY_TIMES   20
 //#define DMA_IIC //modify: MTK??足“3?1y8byte㊣?D?那1車?DMA﹞?那???DDiic赤“D?
 #ifdef DMA_IIC
 #include <linux/dma-mapping.h>
 static unsigned char *I2CDMABuf_va = NULL;
 static volatile unsigned int I2CDMABuf_pa = NULL;
-
-
-
 static void _msg_dma_alloc(void)
 {
     I2CDMABuf_va = (u8 *)dma_alloc_coherent(NULL, 4096, &I2CDMABuf_pa, GFP_KERNEL);
@@ -73,8 +71,19 @@ static void _msg_dma_free(void)
 
 
 ///////////////////////////////////////////////////////////////////////////
-//deleted by yanghaizhou 278208
+u8 bItoTestDebug = 1;
+#define ITO_TEST_DEBUG(format, ...) \
+{ \
+    if(bItoTestDebug) \
+    { \
+        printk(KERN_ERR "ito_test ***" format "\n", ## __VA_ARGS__); \
+        mdelay(5); \
+    } \
+}
+#define ITO_TEST_DEBUG_MUST(format, ...)    \
+    printk(KERN_ERR "ito_test ***" format "\n", ## __VA_ARGS__);mdelay(5)
 
+static int g_i2c_freq = 0;
 
 s16  s16_raw_data_1[48] = {0};
 s16  s16_raw_data_2[48] = {0};
@@ -113,18 +122,19 @@ u8 *MAP41_4 = NULL;
 #define BIT11 (1<<11)
 #define BIT15 (1<<15)
 
+//i2c_client -> g_i2c_client
 static int ito_test_i2c_read(U8 addr, U8* read_data, U16 size)
 {
     int rc;
-    U8 before_addr = msg21xx_i2c_client->addr;
-    msg21xx_i2c_client->addr = addr;
+    U8 before_addr = g_i2c_client->addr;
+    g_i2c_client->addr = addr;
 
 #ifdef DMA_IIC
     if(size>8&&NULL!=I2CDMABuf_va)
     {
         int i = 0;
-        msg21xx_i2c_client->ext_flag = msg21xx_i2c_client->ext_flag | I2C_DMA_FLAG ;
-        rc = i2c_master_recv(msg21xx_i2c_client, (unsigned char *)I2CDMABuf_pa, size);
+        g_i2c_client->ext_flag = g_i2c_client->ext_flag | I2C_DMA_FLAG ;
+        rc = i2c_master_recv(g_i2c_client, (unsigned char *)I2CDMABuf_pa, size);
         for(i = 0; i < size; i++)
    		{
         	read_data[i] = I2CDMABuf_va[i];
@@ -132,16 +142,16 @@ static int ito_test_i2c_read(U8 addr, U8* read_data, U16 size)
     }
     else
     {
-        rc = i2c_master_recv(msg21xx_i2c_client, read_data, size);
+        rc = i2c_master_recv(g_i2c_client, read_data, size);
     }
-    msg21xx_i2c_client->ext_flag = msg21xx_i2c_client->ext_flag & (~I2C_DMA_FLAG);	
+    g_i2c_client->ext_flag = g_i2c_client->ext_flag & (~I2C_DMA_FLAG);	
 #else
-    rc = i2c_master_recv(msg21xx_i2c_client, read_data, size);
+    rc = i2c_master_recv(g_i2c_client, read_data, size);
 #endif
-    msg21xx_i2c_client->addr = before_addr;
+    g_i2c_client->addr = before_addr;
     if( rc < 0 )
     {
-        tp_log_err("ito_test_i2c_read error %d,addr=%d,size=%d\n", rc,addr,size);
+        ITO_TEST_DEBUG_MUST("ito_test_i2c_read error %d,addr=%d,size=%d\n", rc,addr,size);
 
         msg21xx_report_dsm_erro(msg21xx_data, tp_dclient, DSM_TP_I2C_RW_ERROR_NO, rc);
         
@@ -152,8 +162,8 @@ static int ito_test_i2c_read(U8 addr, U8* read_data, U16 size)
 static int ito_test_i2c_write(u8 addr, u8* data, u16 size)//modify : ?迄?Y????DT?? i2c_client
 {
     int rc;
-    u8 before_addr = msg21xx_i2c_client->addr;
-    msg21xx_i2c_client->addr = addr;
+    u8 before_addr = g_i2c_client->addr;
+    g_i2c_client->addr = addr;
 
 #ifdef DMA_IIC
     //printk("hisdar debug:DMA\n");
@@ -164,22 +174,23 @@ static int ito_test_i2c_write(u8 addr, u8* data, u16 size)//modify : ?迄?Y????DT
     	{
     		 I2CDMABuf_va[i]=data[i];
     	}
-		msg21xx_i2c_client->ext_flag = msg21xx_i2c_client->ext_flag | I2C_DMA_FLAG ;
-		rc = i2c_master_send(msg21xx_i2c_client, (unsigned char *)I2CDMABuf_pa, size);
+		g_i2c_client->ext_flag = g_i2c_client->ext_flag | I2C_DMA_FLAG ;
+		rc = i2c_master_send(g_i2c_client, (unsigned char *)I2CDMABuf_pa, size);
 	}
 	else
 	{
-		rc = i2c_master_send(msg21xx_i2c_client, data, size);
+		rc = i2c_master_send(g_i2c_client, data, size);
 	}
-    msg21xx_i2c_client->ext_flag = msg21xx_i2c_client->ext_flag & (~I2C_DMA_FLAG);	
+    g_i2c_client->ext_flag = g_i2c_client->ext_flag & (~I2C_DMA_FLAG);	
 #else
     //printk("hisdar debug:nomal\n");
-    rc = i2c_master_send(msg21xx_i2c_client, data, size);
+    rc = i2c_master_send(g_i2c_client, data, size);
 #endif
-    msg21xx_i2c_client->addr = before_addr;
+    g_i2c_client->addr = before_addr;
     if( rc < 0 )
     {
-        tp_log_err("ito_test_i2c_write error %d,addr = %d,data[0]=%d,size=%d\n", rc, addr,data[0],size);      
+        ITO_TEST_DEBUG_MUST("ito_test_i2c_write error %d,addr = %d,data[0]=%d,size=%d\n", rc, addr,data[0],size);
+        
         msg21xx_report_dsm_erro(msg21xx_data, tp_dclient, DSM_TP_I2C_RW_ERROR_NO, rc);
         
     }
@@ -209,6 +220,8 @@ static void ito_test_enable_irq(void)//modify:?迄?Y????DT??
 }
 
 //static void ito_test_set_iic_rate(u32 iicRate)//modify:?迄?Y??足“DT??,iic?迄?那辰a?車50K
+
+
 
 static void ito_test_WriteReg( u8 bank, u8 addr, u16 data )
 {
@@ -410,7 +423,7 @@ static uint16_t ito_test_get_num( void )
     num_of_sensor = 0;
         
     RegValue1 = ito_test_ReadReg( 0x11, 0x4A);
-    tp_log_info("ito_test_get_num,RegValue1=%d\n",RegValue1);
+    ITO_TEST_DEBUG("ito_test_get_num,RegValue1=%d\n",RegValue1);
     if ( ( RegValue1 & BIT1) == BIT1 )
     {
     	RegValue1 = ito_test_ReadReg( 0x12, 0x0A);			
@@ -428,7 +441,7 @@ static uint16_t ito_test_get_num( void )
 	        num_of_sensor+=(ito_test_ReadReg( 0x12, 0x0A)>>(4*i))&0x0F;
 	    }
 	}
-    tp_log_info("ito_test_get_num,num_of_sensor=%d\n",num_of_sensor);
+    ITO_TEST_DEBUG("ito_test_get_num,num_of_sensor=%d\n",num_of_sensor);
     return num_of_sensor;        
 }
 static void ito_test_polling( void )
@@ -437,32 +450,23 @@ static void ito_test_polling( void )
     uint8_t     dbbus_tx_data[5];
     uint8_t     dbbus_rx_data[4];
     uint16_t    reg_value;
-    uint16_t    i=0;
+
     reg_int = 0;
 
     ito_test_WriteReg( 0x13, 0x0C, BIT15 );       
     ito_test_WriteReg( 0x12, 0x14, (ito_test_ReadReg(0x12,0x14) | BIT0) );         
             
-    tp_log_info("ito_test_polling start\n");
-    for(i=0;i<READREG_RETRY_TIMES;i++)
+    ITO_TEST_DEBUG("polling start\n");
+    while( ( reg_int & BIT0 ) == 0x0000 )
     {
-        mdelay(10);
         dbbus_tx_data[0] = 0x10;
         dbbus_tx_data[1] = 0x3D;
         dbbus_tx_data[2] = 0x18;
         ito_test_i2c_write(ITO_TEST_ADDR_REG, dbbus_tx_data, 3);
         ito_test_i2c_read(ITO_TEST_ADDR_REG,  dbbus_rx_data, 2);
-        reg_int = dbbus_rx_data[1]; 
-        if (( reg_int & BIT0 ) != 0x0000 )
-            break; 
-        tp_log_err("ito_test_polling error,delay 10ms try again,times=%d\n",i+1);
+        reg_int = dbbus_rx_data[1];
     }
-    if(i==READREG_RETRY_TIMES)
-    {
-        tp_log_err("ito_test_polling error\n");
-        return;
-    }
-    tp_log_info("ito_test_polling end\n");
+    ITO_TEST_DEBUG("polling end\n");
     reg_value = ito_test_ReadReg( 0x3D, 0x18 ); 
     ito_test_WriteReg( 0x3D, 0x18, reg_value & (~BIT0) );      
 }
@@ -477,7 +481,7 @@ static uint16_t ito_test_get_data_out( int16_t* s16_raw_data )
     num_of_sensor = ito_test_get_num();
     if(num_of_sensor*2>96)
     {
-        tp_log_info("danger,num_of_sensor=%d\n",num_of_sensor);
+        ITO_TEST_DEBUG("danger,num_of_sensor=%d\n",num_of_sensor);
         return num_of_sensor;
     }
 
@@ -493,7 +497,7 @@ static uint16_t ito_test_get_data_out( int16_t* s16_raw_data )
     mdelay(100);
     for(i=0;i<num_of_sensor * 2;i++)
     {
-        tp_log_info("dbbus_rx_data[%d]=%d\n",i,dbbus_rx_data[i]);
+        ITO_TEST_DEBUG("dbbus_rx_data[%d]=%d\n",i,dbbus_rx_data[i]);
     }
  
     reg_int = ito_test_ReadReg( 0x3d, REG_INTR_FIQ_MASK<<1 ); 
@@ -515,7 +519,7 @@ static void ito_test_send_data_in( uint8_t step )
     uint8_t 	dbbus_tx_data[512];
     uint16_t 	*Type1=NULL;        
 
-    tp_log_info("ito_test_send_data_in step=%d\n",step);
+    ITO_TEST_DEBUG("ito_test_send_data_in step=%d\n",step);
 	if( step == 4 )
     {
         Type1 = &open_1[0];        
@@ -706,7 +710,7 @@ static void ito_test_first( uint8_t item_id , int16_t* s16_raw_data)
 	num_of_sensor = 0;
 	num_of_sensor2 = 0;	
 	
-    tp_log_info("ito_test_first item_id=%d\n",item_id);
+    ITO_TEST_DEBUG("ito_test_first item_id=%d\n",item_id);
 	ito_test_WriteReg( 0x0F, 0xE6, 0x01 );
 
 	ito_test_WriteReg( 0x1E, 0x24, 0x0500 );
@@ -753,7 +757,7 @@ static void ito_test_first( uint8_t item_id , int16_t* s16_raw_data)
             loop = 2;
         }
 	}	
-    tp_log_info("loop=%d\n",loop);
+    ITO_TEST_DEBUG("loop=%d\n",loop);
 	for ( i = 0; i < loop; i++ )
 	{
 		if ( i == 0 )
@@ -782,12 +786,12 @@ static void ito_test_first( uint8_t item_id , int16_t* s16_raw_data)
 		if ( i == 0 )	 
         {      
             num_of_sensor=ito_test_get_data_out(  s16_raw_data_tmp );
-            tp_log_info("num_of_sensor=%d;\n",num_of_sensor);
+            ITO_TEST_DEBUG("num_of_sensor=%d;\n",num_of_sensor);
         }
 		else	
         {      
             num_of_sensor2=ito_test_get_data_out(  &s16_raw_data_tmp[num_of_sensor] );
-            tp_log_info("num_of_sensor=%d;num_of_sensor2=%d\n",num_of_sensor,num_of_sensor2);
+            ITO_TEST_DEBUG("num_of_sensor=%d;num_of_sensor2=%d\n",num_of_sensor,num_of_sensor2);
         }
 	}
     for ( j = 0; j < total_sensor ; j ++ )
@@ -850,7 +854,7 @@ ITO_TEST_RET ito_test_second (u8 item_id)
         jg_tmp2_avg_Th_max = (s16_raw_data_jg_tmp2 / 2) * ( 100 + Th_bor) / 100 ;
 	    jg_tmp2_avg_Th_min = (s16_raw_data_jg_tmp2 / 2 ) * ( 100 - Th_bor) / 100 ;
 	
-        tp_log_info("item_id=%d;sum1=%d;max1=%d;min1=%d;sum2=%d;max2=%d;min2=%d\n",item_id,s16_raw_data_jg_tmp1,jg_tmp1_avg_Th_max,jg_tmp1_avg_Th_min,s16_raw_data_jg_tmp2,jg_tmp2_avg_Th_max,jg_tmp2_avg_Th_min);
+        ITO_TEST_DEBUG("item_id=%d;sum1=%d;max1=%d;min1=%d;sum2=%d;max2=%d;min2=%d\n",item_id,s16_raw_data_jg_tmp1,jg_tmp1_avg_Th_max,jg_tmp1_avg_Th_min,s16_raw_data_jg_tmp2,jg_tmp2_avg_Th_max,jg_tmp2_avg_Th_min);
 
 	if ( item_id == 40 ) 
 	{
@@ -969,7 +973,10 @@ ITO_TEST_RET ito_test_second_2r (u8 item_id)
 	    jg_tmp4_avg_Th_min = (s16_raw_data_jg_tmp4 / 2) * ( 100 - Th_bor) / 100 ;
 		
 	
-        tp_log_info("item_id=%d;sum1=%d;max1=%d;min1=%d;sum2=%d;max2=%d;min2=%d;sum3=%d;max3=%d;min3=%d;sum4=%d;max4=%d;min4=%d;\n",item_id,s16_raw_data_jg_tmp1,jg_tmp1_avg_Th_max,jg_tmp1_avg_Th_min,s16_raw_data_jg_tmp2,jg_tmp2_avg_Th_max,jg_tmp2_avg_Th_min,s16_raw_data_jg_tmp3,jg_tmp3_avg_Th_max,jg_tmp3_avg_Th_min,s16_raw_data_jg_tmp4,jg_tmp4_avg_Th_max,jg_tmp4_avg_Th_min);
+        ITO_TEST_DEBUG("item_id=%d;sum1=%d;max1=%d;min1=%d;sum2=%d;max2=%d;min2=%d;sum3=%d;max3=%d;min3=%d;sum4=%d;max4=%d;min4=%d;\n",item_id,s16_raw_data_jg_tmp1,jg_tmp1_avg_Th_max,jg_tmp1_avg_Th_min,s16_raw_data_jg_tmp2,jg_tmp2_avg_Th_max,jg_tmp2_avg_Th_min,s16_raw_data_jg_tmp3,jg_tmp3_avg_Th_max,jg_tmp3_avg_Th_min,s16_raw_data_jg_tmp4,jg_tmp4_avg_Th_max,jg_tmp4_avg_Th_min);
+
+
+
 
 	if ( item_id == 40 ) 
 	{
@@ -1034,17 +1041,6 @@ static ITO_TEST_RET ito_test_interface(void)
 {
     ITO_TEST_RET ret = ITO_TEST_OK;
     uint16_t i = 0;
-    //change gloable var g_i2c_freq to local var i2c_freq
-    int i2c_freq = 0;
-
-    if(NULL == msg21xx_data){
-        tp_log_err("%s %d: msg21xx_data is null!\n", __func__, __LINE__);
-        return ITO_TEST_FAIL;
-    }
-    if(NULL == msg21xx_i2c_client){
-        tp_log_err("%s %d: msg21xx_i2c_client is null!\n", __func__, __LINE__);
-        return ITO_TEST_FAIL;
-    }
     
     mutex_lock(&scap_test_mutex);
 
@@ -1053,24 +1049,23 @@ static ITO_TEST_RET ito_test_interface(void)
 #ifdef DMA_IIC
     _msg_dma_alloc();
 #endif
-
-    i2c_freq = qup_get_clk_freq(msg21xx_i2c_client->adapter);
-    qup_set_clk_freq(msg21xx_i2c_client->adapter, I2C_FREQUENCY_50000);
-    tp_log_info("ito_test_start\n");
+	g_i2c_freq = qup_get_clk_freq(g_i2c_client->adapter);
+    qup_set_clk_freq(g_i2c_client->adapter, I2C_FREQUENCY_50000);
+    ITO_TEST_DEBUG("start\n");
     ito_test_disable_irq();
-    ito_test_reset();
+	ito_test_reset();
     if(ito_test_choose_TpType() >= SWID_NULL)
     {
-        tp_log_err("choose tpType fail\n");
+        ITO_TEST_DEBUG("choose tpType fail\n");
         ret = ITO_TEST_GET_TP_TYPE_ERROR;
         goto ITO_TEST_END;
     }
     ito_test_EnterSerialDebugMode();
     mdelay(100);
-    tp_log_info("EnterSerialDebugMode\n");
+    ITO_TEST_DEBUG("EnterSerialDebugMode\n");
     ito_test_WriteReg8Bit ( 0x0F, 0xE6, 0x01 );
     ito_test_WriteReg ( 0x3C, 0x60, 0xAA55 );
-    tp_log_info("stop mcu and disable watchdog V.005\n");   
+    ITO_TEST_DEBUG("stop mcu and disable watchdog V.005\n");   
     mdelay(50);
     
 	for(i = 0;i < 48;i++)
@@ -1081,10 +1076,10 @@ static ITO_TEST_RET ito_test_interface(void)
 	}	
 	
     ito_test_first(40, s16_raw_data_1);
-    tp_log_info("40 get s16_raw_data_1\n");
+    ITO_TEST_DEBUG("40 get s16_raw_data_1\n");
 
     ito_test_first(41, s16_raw_data_2);
-    tp_log_info("41 get s16_raw_data_2\n");
+    ITO_TEST_DEBUG("41 get s16_raw_data_2\n");
 
     /* delete key test */
 
@@ -1120,11 +1115,10 @@ static ITO_TEST_RET ito_test_interface(void)
 #ifdef DMA_IIC
     _msg_dma_free();
 #endif
-
-    qup_set_clk_freq(msg21xx_i2c_client->adapter, i2c_freq);
-    ito_test_reset();
+    qup_set_clk_freq(g_i2c_client->adapter, g_i2c_freq);
+	ito_test_reset();
     ito_test_enable_irq();
-    tp_log_info("ito_test_end\n");
+    ITO_TEST_DEBUG("end\n");
 
     msg21xx_start_esd_timer(msg21xx_data);
     
@@ -1142,22 +1136,23 @@ static int msg_scap_test_show(struct device *dev, struct device_attribute *attr,
     int error= 0;
 
     /*--coverity--spintf-->snprintf--*/
+    
     g_ito_test_ret = ito_test_interface();
     
     if(ITO_TEST_OK==g_ito_test_ret)
     {
         error = snprintf(buf, PAGE_SIZE, "PASS\n");
-        tp_log_info("ITO_TEST_OK");
+        ITO_TEST_DEBUG_MUST("ITO_TEST_OK");
     }
     else if(ITO_TEST_FAIL==g_ito_test_ret)
     {
         error = snprintf(buf, PAGE_SIZE, "FAIL\n");
-        tp_log_err("ITO_TEST_FAIL");
+        ITO_TEST_DEBUG_MUST("ITO_TEST_FAIL");
     }
     else if(ITO_TEST_GET_TP_TYPE_ERROR==g_ito_test_ret)
     {
         error = snprintf(buf, PAGE_SIZE, "FAIL\n");
-        tp_log_err("ITO_TEST_GET_TP_TYPE_ERROR");
+        ITO_TEST_DEBUG_MUST("ITO_TEST_GET_TP_TYPE_ERROR");
     }
     
     return error;
@@ -1167,29 +1162,47 @@ static int msg_scap_test_store(struct device *dev, struct device_attribute *attr
 {    
     u16 i = 0;
     mdelay(5);
-    tp_log_info("ito_test_ret = %d",g_ito_test_ret);
+    ITO_TEST_DEBUG_MUST("ito_test_ret = %d",g_ito_test_ret);
     mdelay(5);
     for(i=0;i<48;i++)
     {
-        tp_log_info("data_1[%d]=%d;\n",i,s16_raw_data_1[i]);
+        ITO_TEST_DEBUG_MUST("data_1[%d]=%d;\n",i,s16_raw_data_1[i]);
     }
     mdelay(5);
     for(i=0;i<48;i++)
     {
-        tp_log_info("data_2[%d]=%d;\n",i,s16_raw_data_2[i]);
+        ITO_TEST_DEBUG_MUST("data_2[%d]=%d;\n",i,s16_raw_data_2[i]);
     }
     mdelay(5);
     for(i=0;i<48;i++)
     {
-        tp_log_info("data_3[%d]=%d;\n",i,s16_raw_data_3[i]);
+        ITO_TEST_DEBUG_MUST("data_3[%d]=%d;\n",i,s16_raw_data_3[i]);
     }
     mdelay(5);
     return count;
 }
+static int msg_scap_test_switch_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    int error= 0;
+    
+    bItoTestDebug = 1;
+    
+    /*--coverity--spintf-->snprintf--*/
+    error =  snprintf(buf, PAGE_SIZE, "[MSG]open debug log\n");
+    
+    ITO_TEST_DEBUG_MUST("on debug bItoTestDebug = %d",bItoTestDebug);
 
-//deleted by yanghaizhou 278208
+    return error;
+}
 
-
+static int msg_scap_test_switch_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{    
+	int error = 0;
+    bItoTestDebug = 0;
+	//error =  sprintf(buf, "[MSG]close debug log\n");
+    ITO_TEST_DEBUG_MUST("off debug bItoTestDebug = %d",bItoTestDebug);
+    return error;
+}
 static int msg_scap_test_sample_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     int error= 0;
@@ -1205,13 +1218,13 @@ static int msg_scap_test_sample_show(struct device *dev, struct device_attribute
 		return -ENOMEM;
 	}
     mdelay(5);
-    tp_log_info("ito_test_ret = %d",g_ito_test_ret);
+    ITO_TEST_DEBUG_MUST("ito_test_ret = %d",g_ito_test_ret);
 	memset(data, 0, data_len);
 	memset(tmp_buf, 0, sizeof(tmp_buf));
     //mdelay(5);
     for(i=0;i<48;i++)
     {
-        tp_log_info("data_1[%d]=%d;\n",i,s16_raw_data_1[i]);
+        ITO_TEST_DEBUG_MUST("data_1[%d]=%d;\n",i,s16_raw_data_1[i]);
 
     /*--coverity--spintf-->snprintf--*/
     /*--coverity--strcat-->snstrcat--*/
@@ -1221,14 +1234,14 @@ static int msg_scap_test_sample_show(struct device *dev, struct device_attribute
     mdelay(5);
     for(i=0;i<48;i++)
     {
-        tp_log_info("data_2[%d]=%d;\n",i,s16_raw_data_2[i]);
+        ITO_TEST_DEBUG_MUST("data_2[%d]=%d;\n",i,s16_raw_data_2[i]);
         length = snprintf(tmp_buf, sizeof(tmp_buf), "data_2[%d]=%d;\n",i,s16_raw_data_2[i]);      
         strncat(data, tmp_buf, sizeof(tmp_buf));
     }
     mdelay(5);
     for(i=0;i<48;i++)
     {
-        tp_log_info("data_3[%d]=%d;\n",i,s16_raw_data_3[i]);
+        ITO_TEST_DEBUG_MUST("data_3[%d]=%d;\n",i,s16_raw_data_3[i]);
         length = snprintf(tmp_buf, sizeof(tmp_buf), "data_3[%d]=%d;\n",i,s16_raw_data_3[i]);  
         strncat(data, tmp_buf, sizeof(tmp_buf));
     }
@@ -1244,10 +1257,13 @@ static int msg_scap_test_sample_store(struct device *dev, struct device_attribut
 }
 static DEVICE_ATTR(scap_test, S_IRUGO|S_IWUSR, msg_scap_test_show, msg_scap_test_store);
 static DEVICE_ATTR(scap_test_sample,S_IRUGO|S_IWUSR, msg_scap_test_sample_show, msg_scap_test_sample_store);
+static DEVICE_ATTR(scap_test_log_switch, S_IRUGO|S_IWUSR, msg_scap_test_switch_show, msg_scap_test_switch_store);
+
 
 static struct attribute *msg_attributes[] = {
 	&dev_attr_scap_test.attr,
 	&dev_attr_scap_test_sample.attr,
+	&dev_attr_scap_test_log_switch.attr,
 	NULL
 };
 
@@ -1257,35 +1273,35 @@ static struct attribute_group msg_attribute_group = {
 static struct kobject *touch_screen_kobject_ts = NULL;
 int ito_test_create_entry(void)
 {
-    int error = 0;
+	int error = 0;
 
-    //some comments here deleted by yanghaizhou 278208
-    if( NULL == touch_screen_kobject_ts )
-    {
-        touch_screen_kobject_ts = kobject_create_and_add("touch_screen", NULL);
-        if (!touch_screen_kobject_ts)
-        {
-            tp_log_err("%s %d: touch_screen_kobject created fail!\n", __func__, __LINE__);
-            error=-EIO;
-            return error;
-        }
-    }
-    error = sysfs_create_group(touch_screen_kobject_ts, &msg_attribute_group);
-    if (0 != error) {
-        tp_log_err("%s %d: msg_attribute_group created fail!\n", __func__, __LINE__);
-        sysfs_remove_group(touch_screen_kobject_ts, &msg_attribute_group);
-        error=-EIO;
-        return error;
-    }
+    //printk("%s %d:enterd!\n", __func__, __LINE__);
+	if( NULL == touch_screen_kobject_ts )
+	{
+		touch_screen_kobject_ts = kobject_create_and_add("touch_screen", NULL);
+		if (!touch_screen_kobject_ts)
+		{
+			error=-EIO;
+			return error;
+		}
+	}
+	
+	error = sysfs_create_group(touch_screen_kobject_ts, &msg_attribute_group);
+	if (0 != error) {
+		
+		sysfs_remove_group(touch_screen_kobject_ts, &msg_attribute_group);
+		error=-EIO;
+		return error;
+	}
+
     mutex_init(&scap_test_mutex);
 
-
-    return error;   
+	return error;   
 }
 
 
 void msg_release_sysfs(struct i2c_client *client)
 {
 	sysfs_remove_group(touch_screen_kobject_ts, &msg_attribute_group);
-	touch_screen_kobject_ts = NULL;
+	touch_screen_kobject_ts = NULL;	
 }

@@ -433,19 +433,19 @@
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps =
 				<87 512 0 0>,
-				<87 512 80000 0>,
+                                <87 512 80000 0>,
 				<87 512 6000  6000>;
 		clocks = <&clock_gcc clk_gcc_usb_hs_ahb_clk>,
 			 <&clock_gcc clk_gcc_usb_hs_system_clk>,
 			 <&clock_gcc clk_gcc_usb2a_phy_sleep_clk>,
-			 <&clock_rpm clk_bimc_usb_a_clk>,
-			 <&clock_rpm clk_snoc_usb_a_clk>,
-			 <&clock_rpm clk_pcnoc_usb_a_clk>,
+                         <&clock_rpm clk_bimc_usb_a_clk>,
+                         <&clock_rpm clk_snoc_usb_a_clk>,
+                         <&clock_rpm clk_pcnoc_usb_a_clk>,
 			 <&clock_rpm clk_xo_otg_clk>;
 		clock-names = "iface_clk", "core_clk", "sleep_clk",
-				"bimc_clk", "snoc_clk", "pcnoc_clk",
+                                "bimc_clk", "snoc_clk", "pcnoc_clk",
 				"xo";
-		qcom,bus-clk-rate = <400000000 200000000 100000000>;
+                qcom,bus-clk-rate = <400000000 200000000 100000000>;
 	};
 
 	android_usb: android_usb@086000c8 {
@@ -674,7 +674,7 @@
 		compatible = "qcom,msm-watchdog";
 		reg = <0xb017000 0x1000>;
 		interrupts = <0 3 0>, <0 4 0>;
-		qcom,bark-time = <13000>;
+		qcom,bark-time = <11000>;
 		qcom,pet-time = <10000>;
 		qcom,ipi-ping;
 	};
@@ -1317,11 +1317,9 @@
 		clock-names = "iface_clk", "core_clk";
 		qcom,clk-freq-out = <100000>;
 		qcom,clk-freq-in  = <19200000>;
-		pinctrl-names = "i2c_active", "i2c_sleep", "i2c_defult";
+		pinctrl-names = "i2c_active", "i2c_sleep";
 		pinctrl-0 = <&i2c_0_active>;
 		pinctrl-1 = <&i2c_0_sleep>;
-		pinctrl-2 = <&i2c_0_defult>;
-		gpios = <&msm_gpio 7 0>, <&msm_gpio 6 0>;
 		qcom,noise-rjct-scl = <0>;
 		qcom,noise-rjct-sda = <0>;
 		qcom,bam-pipe-idx-cons = <6>;

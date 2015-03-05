@@ -65,7 +65,7 @@
 
 jeita_spec jeita_batt_param =
 {
-	.normal	= {100,420,1250,4320},
+	.normal	= {100,420,1250,4350},
 	.hot.t_high = -1
 };
 
@@ -90,14 +90,13 @@ extern int hot_design_current;
 #define CURRENT_LIMIT_800MA	800
 #define CURRENT_LIMIT_1800MA	1800
 #define MAX_CHARGE_CURRENT	1150
-#define BATTERY_VOL_THRESHOLD	3600
+#define BATTERY_VOL_THRESHOLD	3700
 #define BQ24152_REG_0_FAULT_MASK	0x07
 #define BQ24152_REG_0_STAT_MASK		0x30
 #define BQ24152_CHG_STAT_FAULT	3
 #define POOR_INPUT_FAULT_STATUS	3
 #define CHARGE_CURRENT_STEP	100
 #define DELAYED_TIME	2500
-#define SLEEP_MODE		2
 
 #define BQ2415X_REG_STATUS		0x00
 #define BQ2415X_REG_CONTROL		0x01
@@ -1093,7 +1092,7 @@ static void bq2415x_timer_work(struct work_struct *work)
 		dump_registers_and_adc(charger_dclient,g_lbc_chip,DSM_CHARGER_BQ_BOOST_FAULT_ERROR_NO);
 	}
 
-	if(!boost && error && (SLEEP_MODE != error)){
+	if(!boost && error){
 		pr_err("find charge mode fault! such as poor input source, VBUS OVP, battery is too"
 			"low, timer fault, thermal shutdown and so on\n");
 		dump_registers_and_adc(charger_dclient,g_lbc_chip,DSM_CHARGER_BQ_NORMAL_FAULT_ERROR_NO);
@@ -1205,23 +1204,6 @@ static void bq2415x_iusb_work(struct work_struct *work)
 	//remove redundant code
 			return;
 		}
-	}else{
-		/* enable charging otherwise high/cold temperature or high impedance */
-		if((!bq->charge_disable)
-			&& (!bq2415x_exec_command(bq, BQ2415X_HIGH_IMPEDANCE_STATUS))){
-			rc = bq2415x_exec_command(bq, BQ2415X_CHARGER_ENABLE);
-			if(rc < 0){
-				pr_info("charge enable set failed\n");
-				return;
-			}
-		}
-	}
-	/* disable stat pin for turn off the led */
-	rc = bq2415x_exec_command(bq, BQ2415X_STAT_PIN_DISABLE);
-	if(rc < 0)
-	{
-		pr_info("disable pin failed\n");
-		return;
 	}
 	msleep(DELAYED_TIME);
 	power_supply_changed(&bq->charger);
@@ -1387,15 +1369,6 @@ static void bq2415x_usb_low_power_work(struct work_struct *work)
 		pr_err("set charge current failed\n");
 		return;
 	}
-
-	/* disable stat pin for turn off the led */
-	rc = bq2415x_exec_command(bq, BQ2415X_STAT_PIN_DISABLE);
-	if(rc < 0)
-	{
-		pr_info("disable pin failed\n");
-		return;
-	}
-
 	spin_lock(&current_config_changed_lock);
 	current_config_changed = true;
 	spin_unlock(&current_config_changed_lock);
@@ -1474,9 +1447,6 @@ static int bq2415x_power_supply_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_PRESENT:
 		if(bq->qcom_charger_psy)
 			ret = bq->qcom_charger_psy->get_property(bq->qcom_charger_psy,POWER_SUPPLY_PROP_PRESENT,val);
-		/* if qcom_charger_psy is not ready, should return 1(present in default) */
-		else
-			val->intval = 1;
 		break;
 	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 		val->intval= bq2415x_exec_command(bq,BQ2415X_CHARGER_STATUS);

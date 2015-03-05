@@ -43,11 +43,6 @@
 #define MAX_CPU_CTX_SIZE	1024
 
 #ifdef CONFIG_HUAWEI_KERNEL
-#define RESET_MAGIC_WDT_BARK 0x5742524B
-extern void *hw_reset_magic_addr;
-#endif
-
-#ifdef CONFIG_HUAWEI_KERNEL
 #define DIV_FACTOR_NS 1000000000             /* nsec and sec for conversion */
 #endif
 
@@ -358,12 +353,6 @@ static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 	if (wdog_dd->do_ipi_ping)
 		dump_cpu_alive_mask(wdog_dd);
 	printk(KERN_INFO "Causing a watchdog bite!");
-
-#ifdef CONFIG_HUAWEI_KERNEL
-	if (hw_reset_magic_addr)
-		__raw_writel(RESET_MAGIC_WDT_BARK, hw_reset_magic_addr);
-#endif
-
 	__raw_writel(1, wdog_dd->base + WDT0_BITE_TIME);
 	mb();
 	__raw_writel(1, wdog_dd->base + WDT0_RST);

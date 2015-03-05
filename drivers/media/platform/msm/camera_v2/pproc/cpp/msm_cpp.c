@@ -1425,7 +1425,7 @@ static int msm_cpp_cfg(struct cpp_device *cpp_dev,
 		if (rc < 0) {
 			rc = -EAGAIN;
 			CPP_DBG("error getting buffer rc:%d\n", rc);
-			/* delete some lines */
+			camera_report_dsm_err( DSM_CAMERA_CPP_BUFF_ERR, rc, "[msm_cpp]CPP ERROR.");
 			goto ERROR2;
 		}
 		new_frame->output_buffer_info[0].index = buff_mgr_info.index;

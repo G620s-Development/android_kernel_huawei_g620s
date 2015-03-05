@@ -70,13 +70,6 @@ int qpnp_pon_wd_config(bool enable)
 }
 #endif
 
-#ifdef CONFIG_HUAWEI_KERNEL
-enum {
-	PON_REASON_INDEX = 0,
-	POFF_REASON_INDEX,
-	WARM_REASON_INDEX,
-	MAX_REG_TYPE
-};
-#endif
+#define POWERONOFF_REASON_MAXLEN    256
 
 #endif

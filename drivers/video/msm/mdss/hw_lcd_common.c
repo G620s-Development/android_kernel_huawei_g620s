@@ -356,8 +356,7 @@ int mdss_record_dsm_err(struct mdss_dsi_ctrl_pdata *ctrl, struct dsm_client *lcd
 
 int lcd_report_dsm_err(struct mdss_dsi_ctrl_pdata *ctrl, int type, int err_value,int add_value)
 {
-	/* we will ignore lcd error 20100 for 0x51 */
-	if ((DSM_LCD_MIPI_ERROR_NO == type && 0x51 == add_value)|| DSM_LCD_MDSS_DSI_ISR_ERROR_NO == type)
+	if ((DSM_LCD_MIPI_ERROR_NO == type && 0x51 == err_value)|| DSM_LCD_MDSS_DSI_ISR_ERROR_NO == type)
 	{
 		return 0;
 	}
@@ -446,7 +445,7 @@ void mdp_underrun_dsm_report(unsigned long num,unsigned long underrun_cnt,int cp
 		LCD_LOG_ERR("%s: buffer is busy!\n", __func__);
 		return;
 	}
-	dsm_client_record(lcd_dclient, "Lcd underrun detected for ctl=%d,count=%d,cpu0_freq=%d,mdp_clk_rate=%d,clk_axi=%d,clk_ahb=%d \n"      \
-		,num,underrun_cnt,cpu_freq,(unsigned int)mdp_clk_rate,(unsigned int)clk_axi,(unsigned int)clk_ahb);
+	
+	dsm_client_record(lcd_dclient, "Lcd underrun detected for ctl=%d count=%d cpu0_freq=%d mdp_clk_rate=%ld clk_axi=%ld clk_ahb=%ld \n",num,underrun_cnt,cpu_freq,mdp_clk_rate,clk_axi,clk_ahb);
 	dsm_client_notify(lcd_dclient, DSM_LCD_MDSS_UNDERRUN_ERROR_NO);
 }

@@ -40,13 +40,6 @@
 #include <linux/msm_thermal_ioctl.h>
 #include <soc/qcom/rpm-smd.h>
 #include <soc/qcom/scm.h>
-#ifdef CONFIG_HUAWEI_KERNEL
-#include <linux/io.h>
-
-#define RESET_MAGIC_THERMAL 0x54484D4C
-extern void *hw_reset_magic_addr;
-#endif
-
 
 #define MAX_CURRENT_UA 100000
 #define MAX_RAILS 5
@@ -117,7 +110,6 @@ static struct attribute_group cx_attr_gp;
 static struct attribute_group gfx_attr_gp;
 static struct attribute_group mx_attr_group;
 static struct regulator *vdd_mx;
-static long *tsens_temp_at_panic;
 
 enum thermal_threshold {
 	HOTPLUG_THRESHOLD_HIGH,
@@ -1065,23 +1057,6 @@ get_temp_exit:
 	return ret;
 }
 
-static int msm_thermal_panic_callback(struct notifier_block *nfb,
-	unsigned long event, void *data)
-{
-	int i;
-
-	for (i = 0; i < max_tsens_num; i++) {
-		therm_get_temp(tsens_id_map[i],THERM_TSENS_ID, &tsens_temp_at_panic[i]);
-		pr_debug("[KTM]:sensor_id=%d, temp=%ld.\n", tsens_id_map[i], tsens_temp_at_panic[i]);
-	}
-
-	return NOTIFY_OK;
-}
-
-static struct notifier_block msm_thermal_panic_notifier = {
-	.notifier_call = msm_thermal_panic_callback,
-};
-
 static int set_threshold(uint32_t zone_id,
 	struct sensor_threshold *threshold)
 {
@@ -1268,12 +1243,6 @@ static void msm_thermal_bite(int tsens_id, long temp)
 {
 	pr_err("TSENS:%d reached temperature:%ld. System reset\n",
 		tsens_id, temp);
-
-#ifdef CONFIG_HUAWEI_KERNEL
-	if (hw_reset_magic_addr)
-		__raw_writel(RESET_MAGIC_THERMAL, hw_reset_magic_addr);
-#endif
-
 	scm_call_atomic1(SCM_SVC_BOOT, THERM_SECURE_BITE_CMD, 0);
 }
 
@@ -2937,27 +2906,7 @@ done_mx_nodes:
 	return ret;
 }
 
-static void msm_thermal_panic_notifier_init(struct device *dev)
-{
-	int i;
-
-	tsens_temp_at_panic = devm_kzalloc(dev,
-	sizeof(long) * max_tsens_num,
-	GFP_KERNEL);
-
-	if (!tsens_temp_at_panic) {
-		pr_err("kzalloc failed\n");
-		return;
-	}
-
-	for (i = 0; i < max_tsens_num; i++) {
-		tsens_temp_at_panic[i] = LONG_MIN;
-	}
-
-	atomic_notifier_chain_register(&panic_notifier_list, &msm_thermal_panic_notifier);
-}
-
-int msm_thermal_pre_init(struct device *dev)
+int msm_thermal_pre_init(void)
 {
 	int ret = 0;
 
@@ -2976,11 +2925,6 @@ int msm_thermal_pre_init(struct device *dev)
 		pr_err("Creating sensor id map failed\n");
 		ret = -EINVAL;
 		goto pre_init_exit;
-	}
-
-	if (!tsens_temp_at_panic){
-		msm_thermal_panic_notifier_init(dev);
-		pr_info("msm thermal panic notifier inited successfully.\n");
 	}
 
 	if (!thresh) {
@@ -4011,8 +3955,7 @@ static int msm_thermal_dev_probe(struct platform_device *pdev)
 	memset(&data, 0, sizeof(struct msm_thermal_data));
 	data.pdev = pdev;
 
-	ret = msm_thermal_pre_init(&pdev->dev);
-
+	ret = msm_thermal_pre_init();
 	if (ret) {
 		pr_err("thermal pre init failed. err:%d\n", ret);
 		goto fail;

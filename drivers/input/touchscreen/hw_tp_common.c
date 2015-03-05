@@ -16,7 +16,7 @@ static struct kobject *touch_screen_kobject_ts = NULL;
 static struct kobject *touch_glove_func_ts = NULL;
 
 static unsigned char  is_tp_driver_running_flag = 0;
-struct kobject *virtual_key_kobject_ts = NULL;
+
 unsigned char already_has_tp_driver_running(void)
 {
     return is_tp_driver_running_flag;
@@ -48,29 +48,6 @@ struct kobject* tp_get_touch_screen_obj(void)
 	}
 
 	return touch_screen_kobject_ts;
-}
-
-struct kobject* tp_get_virtual_key_obj(char *name)
-{
-	if( NULL == virtual_key_kobject_ts )
-	{
-		virtual_key_kobject_ts = kobject_create_and_add(name, NULL);
-		if (!virtual_key_kobject_ts)
-		{
-			tp_log_err("%s: create virtual_key kobjetct error!\n", __func__);
-			return NULL;
-		}
-		else
-		{
-			tp_log_debug("%s: create virtual_key successful!\n", __func__);
-		}
-	}
-	else
-	{
-		tp_log_debug("%s: virtual_key already exist!\n", __func__);
-	}
-
-	return virtual_key_kobject_ts;
 }
 
 struct kobject* tp_get_glove_func_obj(void)

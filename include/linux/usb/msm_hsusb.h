@@ -333,7 +333,7 @@ struct msm_otg_platform_data {
 #define B_TST_SRP	8
 #define B_TST_CONFIG	9
 
-#define USB_NUM_BUS_CLOCKS	3
+#define USB_NUM_BUS_CLOCKS      3
 
 /**
  * struct msm_otg: OTG driver data. Shared by HCD and DCD.
@@ -395,7 +395,7 @@ struct msm_otg {
 	struct clk *pclk;
 	struct clk *core_clk;
 	struct clk *sleep_clk;
-	struct clk *bus_clks[USB_NUM_BUS_CLOCKS];
+        struct clk *bus_clks[USB_NUM_BUS_CLOCKS];
 	long core_clk_rate;
 	struct resource *io_res;
 	void __iomem *regs;
@@ -444,7 +444,7 @@ struct msm_otg {
 	bool mhl_enabled;
 	bool host_bus_suspend;
 	bool device_bus_suspend;
-	bool bus_clks_enabled;
+        bool bus_clks_enabled;
 	struct timer_list chg_check_timer;
 	/*
 	 * Allowing PHY power collpase turns off the HSUSB 3.3v and 1.8v

@@ -88,8 +88,8 @@
 		avago,ga_a_value = <111>;
 		avago,ga_c_value = <518>;
 		avago,ga_d_value = <212>;
-		avago,window = <161>;
-		avago,wave = <58>;
+		avago,window = <80>;
+		avago,wave = <35>;
 		avago,ga_e_value = <220>;
 		avago,ga_f_value = <43>;
 	};

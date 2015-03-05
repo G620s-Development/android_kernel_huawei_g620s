@@ -609,16 +609,6 @@ static int msm_sensor_get_af_status(struct msm_sensor_ctrl_t *s_ctrl,
 	return 0;
 }
 
-static int msm_sensor_get_afc_otp_info(struct msm_sensor_ctrl_t *s_ctrl,
-			void __user *argp)
-{
-	struct msm_sensor_afc_otp_info *odata = (struct msm_sensor_afc_otp_info *)argp;
-	odata->starting_dac = s_ctrl->afc_otp_info.starting_dac;
-	odata->infinity_dac = s_ctrl->afc_otp_info.infinity_dac;
-	odata->macro_dac = s_ctrl->afc_otp_info.macro_dac;
-	return 0;
-}
-
 static long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 			unsigned int cmd, void *arg)
 {
@@ -636,8 +626,6 @@ static long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 	case VIDIOC_MSM_SENSOR_RELEASE:
 		msm_sensor_stop_stream(s_ctrl);
 		return 0;
-	case VIDIOC_MSM_SENSOR_GET_AFC_OTP_INFO:  
-	    return msm_sensor_get_afc_otp_info(s_ctrl, argp);
 	case MSM_SD_SHUTDOWN:
 		return 0;
 	default:

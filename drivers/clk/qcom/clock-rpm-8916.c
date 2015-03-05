@@ -140,9 +140,9 @@ static struct clk_lookup msm_clocks_rpm[] = {
 	CLK_LIST(bimc_acpu_a_clk),
 	CLK_LIST(pcnoc_keepalive_a_clk),
 
-	CLK_LIST(pcnoc_usb_a_clk),
-	CLK_LIST(snoc_usb_a_clk),
-	CLK_LIST(bimc_usb_a_clk),
+        CLK_LIST(pcnoc_usb_a_clk),
+        CLK_LIST(snoc_usb_a_clk),
+        CLK_LIST(bimc_usb_a_clk),
 
 	/* CoreSight clocks */
 	CLK_LIST(qdss_clk),

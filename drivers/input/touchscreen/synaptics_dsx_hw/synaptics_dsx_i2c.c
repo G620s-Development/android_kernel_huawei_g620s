@@ -156,15 +156,7 @@ u32 easywake_position[MAX_LOTUS_NUM] = {0};
 u8 double_tap_zone[DOUBLE_TAP_ZONE_BYTES+1] = {0};
 /* indicate if the easy wakeup process is running */
 static bool easy_wakeup_process = false;
-/*delay 8s for permitting glove to finger on the edge of TP, when tp resumed*/
-#define DELAY_TIME_ENABLE_EDGE_GLOVE_SWITCH 8000
-#define F51_CTRL_EDGE_GLOVE_OFFSET 20
-static bool edge_glove_switch_process = false;
-static void synaptics_edge_glove_to_finger_delay_work(struct work_struct *work);
-#define F51_CTRL_GRIP_ALGORITHM_MODE_OFFSET 21
-#define F51_CTRL_GRIP_ALGORITHM_DISTANCE_OFFSET 22
-#define GRIP_ALGORITHM_BYTES_NUM  4
-static bool grip_algorithm_state = false;
+
 #if USE_WAKEUP_GESTURE
 static u32 gesture_count[GESTURE_MAX] = {0};
 #endif
@@ -832,8 +824,6 @@ static ssize_t synaptics_rmi4_f01_flashprog_show(struct device *dev,
 	unsigned char glove_mode = 0;
 	/*Read doze wakeup threshold param for debug*/
 	unsigned char doze_wakeup_threshold = 0;
-	unsigned char glove_edge_state = 0;
-	unsigned char grip_algorithm_mode = 0;
 
 	retval = synaptics_rmi4_i2c_read(rmi4_data,
 			rmi4_data->f11_data_base_addr+F11_2D_DATA28_OFFSET,
@@ -897,29 +887,6 @@ static ssize_t synaptics_rmi4_f01_flashprog_show(struct device *dev,
 				__func__);
 		return retval;
 	}
-	/*To read the register of the glove edge switch, 1: disable, 0: enable*/
-	retval = synaptics_rmi4_i2c_read(rmi4_data,
-			rmi4_data->f51_ctrl_base_addr + F51_CTRL_EDGE_GLOVE_OFFSET,
-			&glove_edge_state,
-			sizeof(glove_edge_state));
-	if (retval < 0) {
-		dev_err(&(rmi4_data->input_dev->dev),
-				"%s: Failed to read glove edge state\n",
-				__func__);
-		return retval;
-	}
-	/*To read the register of the grip algorithm mode , 0: disable, 1: enable*/
-	retval = synaptics_rmi4_i2c_read(rmi4_data,
-			rmi4_data->f51_ctrl_base_addr + F51_CTRL_GRIP_ALGORITHM_MODE_OFFSET,
-			&grip_algorithm_mode,
-			sizeof(grip_algorithm_mode));
-	if (retval < 0) {
-		dev_err(&(rmi4_data->input_dev->dev),
-				"%s: Failed to read grip algorithm state for synaptics\n",
-				__func__);
-		return retval;
-	}
-	grip_algorithm_mode = grip_algorithm_mode & MASK_1BIT;
 
 	return snprintf(buf, PAGE_SIZE, "flash_prog=%u\n"
 		"f01_data[0]=%d \n"
@@ -927,12 +894,9 @@ static ssize_t synaptics_rmi4_f01_flashprog_show(struct device *dev,
 		"palm_data=%d\n"
 		"no_sleep_setting=%d\n"
 		"glove_mode=%d\n"
-		"doze_wakeup_threshold=%d\n"
-		"glove_edge_state=%d\n"
-		"grip_algorithm_mode=%d\n",
+		"doze_wakeup_threshold=%d\n",
 		device_status.flash_prog,
-		data[0],data[1],device_data,no_sleep_setting,glove_mode,doze_wakeup_threshold,
-		glove_edge_state, grip_algorithm_mode);
+		data[0],data[1],device_data,no_sleep_setting,glove_mode,doze_wakeup_threshold);
 }
 
 static ssize_t synaptics_rmi4_0dbutton_show(struct device *dev,
@@ -1264,32 +1228,7 @@ static int set_glove_mode(struct synaptics_rmi4_data *rmi4_data,enum syanptics_g
 
 	return 0;
 }
-static int set_edge_glove_state(struct synaptics_rmi4_data *rmi4_data, int edge_glove_state)
-{
-	int ret;
-	unsigned char data = edge_glove_state;
 
-	/*Set glove edge state*/
-	ret = synaptics_rmi4_i2c_write(rmi4_data,
-			rmi4_data->f51_ctrl_base_addr + F51_CTRL_EDGE_GLOVE_OFFSET,
-			&data,
-			sizeof(data));
-	if (ret < 0) {
-		tp_log_err("%s: Failed to set glove edge state=%d!\n",
-				__func__,data);
-		return ret;
-	} else{
-		tp_log_debug("%s: glove edge state is %d!\n",
-				__func__,data);
-	}
-
-	return 0;
-}
-
-/*In EmUi3.0, holster switch will also change glove state, so we also */
-/* need to record this state to make sure driver sync with ui state */
-static int holster_enable_glove = false;
-static int synaptics_force_cal(struct synaptics_rmi4_data *rmi4_data);
 static ssize_t synaptics_glove_func_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
@@ -1313,57 +1252,23 @@ static ssize_t synaptics_glove_func_store(struct device *dev,
 
 	if (value > 0)
 	{
-		/* In case that glove has already opened by ui before holster */
-		/* covered, we should change glove mode from mode 0 to mode 3 */
-		if ((true == rmi4_data->holster_enabled)&&
-				(true == rmi4_data->glove_enabled))
+		if (true == rmi4_data->holster_enabled)
 		{
 			/*TP will only response to glove in holster mode*/
-			tp_log_debug("%s: line=%d\n",__func__,__LINE__);
 			ret = set_glove_mode(rmi4_data,SYSTEM_LOCKED_TO_GLOVE_MODE);
 		}
-		/* In case that glove has not been opened by ui before holster */
-		/* covered, we do not need to do anyhing here  */
-		else if((true == rmi4_data->holster_enabled)&&
-					(false == rmi4_data->glove_enabled))
-		{
-			/*Do nothing, holster will finish the rest later*/
-			tp_log_warning("%s: line=%d\n",__func__,__LINE__);
-		}
-		/* In other case, we just need to set glove mode 0 */
-		/* and record ui state by driver flag glove_enabled */
 		else
 		{
 			/*TP will response to finger and glove,with finger priority*/
-			tp_log_debug("%s: line=%d\n",__func__,__LINE__);
 			ret = set_glove_mode(rmi4_data,SYSTEM_START_IN_SKIN_MODE);
-			rmi4_data->glove_enabled = RMI4_GLOV_FUNC_ENABLED;
 		}
+		rmi4_data->glove_enabled = RMI4_GLOV_FUNC_ENABLED;
 	}
 	else
 	{
-		/* In case that holster has been covered, */
-		/* we do not need to do anyhing here */
-		if (true == rmi4_data->holster_enabled)
-		{
-			/*Do nothing, holster will finish the rest later*/
-			/* holster was opened, do one force cal , as early as possible */
-			ret = synaptics_force_cal(rmi4_data);
-			if (ret < 0) {
-				tp_log_err("%s: Failed to force calibration!ret=%d\n",
-						__func__,ret);
-			}
-			tp_log_warning("%s: line=%d\n",__func__,__LINE__);
-		}
-		/* In other case, we just need to set glove mode 2 */
-		/* and record ui state by driver flag glove_enabled */
-		else
-		{
-			/*TP will only response to finger*/
-			tp_log_debug("%s: line=%d\n",__func__,__LINE__);
-			ret = set_glove_mode(rmi4_data,SYSTEM_LOCKED_TO_SKIN_MODE);
-			rmi4_data->glove_enabled = RMI4_GLOV_FUNC_DISABLED;
-		}
+		/*TP will only response to finger*/
+		ret = set_glove_mode(rmi4_data,SYSTEM_LOCKED_TO_SKIN_MODE);
+		rmi4_data->glove_enabled = RMI4_GLOV_FUNC_DISABLED;
 	}
 	tp_log_debug("%s: glove_enabled=%d", __func__, rmi4_data->glove_enabled);
 
@@ -1467,88 +1372,7 @@ static int set_effective_window(struct synaptics_rmi4_data *rmi4_data,struct hol
 
 	return ret;
 }
-/**
- * To set the grip algorithm mode by the last bit of f51_custom_ctrl80
- * 1 : enble
- * 0 : disble
- */
-static int set_grip_algorithm_mode(struct synaptics_rmi4_data *rmi4_data, unsigned char mode)
-{
-	unsigned char device_ctrl;
-	unsigned char grip_algorithm_mode = mode;
-	int ret = 0;
 
-	/*Read F51_CUSTOM_CTRL80 to get grip algorithm mode*/
-	ret = synaptics_rmi4_i2c_read(rmi4_data,
-			rmi4_data->f51_ctrl_base_addr + F51_CTRL_GRIP_ALGORITHM_MODE_OFFSET,
-			&device_ctrl,
-			sizeof(device_ctrl));
-	if (ret < 0) {
-		tp_log_err("%s: Failed to read grip algorithm mode\n",
-				__func__);
-		return ret;
-	}
-	tp_log_debug("%s: device_ctrl = %d!\n", __func__, device_ctrl);
-	device_ctrl = (device_ctrl & (~MASK_1BIT));
-	device_ctrl = (device_ctrl | grip_algorithm_mode);
-	tp_log_debug("%s: device_ctrl = %d!\n", __func__, device_ctrl);
-
-	/*Write F51_CUSTOM_CTRL80 to set grip algorithm mode*/
-	ret = synaptics_rmi4_i2c_write(rmi4_data,
-			rmi4_data->f51_ctrl_base_addr + F51_CTRL_GRIP_ALGORITHM_MODE_OFFSET,
-			&device_ctrl,
-			sizeof(device_ctrl));
-	if (ret < 0){
-		tp_log_err("%s:failed to set grip algorithm mode!ret = %d\n",__func__,ret);
-	}else{
-		tp_log_warning("%s: succeeded to set grip algorithm mode! grip_algorithm_mode = %d\n", 
-			__func__, grip_algorithm_mode);
-	}
-
-	return ret;
-}
-/*To set the grip algorithm edge distance*/
-static int set_grip_algorithm_edge_distance(struct synaptics_rmi4_data *rmi4_data)
-{
-	int ret = 0;
-	unsigned char f51_custom_ctrl81[GRIP_ALGORITHM_BYTES_NUM] = {0};
-
-	if(true == rmi4_data->board->grip_algorithm_enabled){
-		/*enble grip algorithm*/
-		ret = set_grip_algorithm_mode(rmi4_data, true);
-		if(ret < 0){
-			tp_log_err("%s:failed to enable grip algorithm!ret = %d\n",__func__,ret);
-			return ret;
-		}
-	}else{
-		/*disable grip algorithm, no need to set the grip algorithm edge distance*/
-		ret = set_grip_algorithm_mode(rmi4_data, false);
-		if(ret < 0){
-			tp_log_err("%s:failed to disable grip algorithm!ret = %d\n",__func__,ret);
-		}
-		return ret;
-	}
-	/**
-	* TP X coordinate pixel size  :  1100, Physical Dimensions : 68mm
-	* left edge distance is 3mm for better performance, right edge distance is 3mm too.
-	* According to the proportion:3mm is 50 TP pixels for left, 1050 TP pixels for right.
-	*/
-	f51_custom_ctrl81[0] = rmi4_data->board->grip_left_lsb;
-	f51_custom_ctrl81[1] = rmi4_data->board->grip_left_msb;
-	f51_custom_ctrl81[2] = rmi4_data->board->grip_right_lsb;
-	f51_custom_ctrl81[3] = rmi4_data->board->grip_right_msb;
-
-	/* Write grip zone of left and right edge to f51_custom_ctrl81 (81~84)*/
-	ret = synaptics_rmi4_i2c_write(rmi4_data,
-			rmi4_data->f51_ctrl_base_addr + F51_CTRL_GRIP_ALGORITHM_DISTANCE_OFFSET,
-			&f51_custom_ctrl81[0],
-			sizeof(f51_custom_ctrl81));
-	if (ret < 0){
-		tp_log_err("%s:failed to set grip algorithm edge distance!ret = %d\n",__func__,ret);
-	}
-
-	return ret;
-}
 /*
  * Use to define double-tap gesture zone that read from dtsi
 */
@@ -1610,106 +1434,6 @@ static ssize_t synaptics_holster_func_show(struct device *dev,
 				synap_holster_info.top_left_y0, synap_holster_info.bottom_right_x1, synap_holster_info.bottom_right_y1);
 }
 
-/*
-	this function will set the glove/holster's sensitivity.
-	when holster was covered , low sensitivity will be set.
-	shen holster was opned and glove was enabled , default sensitivity will be set.
-	the default sensitivity value was read when TP probe.
-	the low sensitivity value was set in this function.
-*/
-static int synaptics_set_holster_low_sensitivity(struct synaptics_rmi4_data *rmi4_data, unsigned char enabled)
-{
-	int ret;
-	if (0 == enabled) { // set the default sensitivity value
-		tp_log_debug("%s: write reg value, begin(%d)\n", __func__, enabled);
-		ret = synaptics_rmi4_i2c_write(rmi4_data,
-				PDT_P4_F51_CUSTOM_CTRL_BASE+F51_CTRL_01_OFFSET,
-				&rmi4_data->f51_ctrl_01_val,
-				sizeof(rmi4_data->f51_ctrl_01_val));
-		if (ret < 0) {
-			tp_log_err("%s: Failed to write F51_CTRL_01 register!\n",
-					__func__);
-			return ret;
-		}
-		tp_log_debug("%s: write reg value, f51_ctrl_01_val:0x%x \n", __func__, rmi4_data->f51_ctrl_01_val);
-		ret = synaptics_rmi4_i2c_write(rmi4_data,
-				PDT_P4_F51_CUSTOM_CTRL_BASE+F51_CTRL_04_OFFSET,
-				&rmi4_data->f51_ctrl_04_val,
-				sizeof(rmi4_data->f51_ctrl_04_val));
-		if (ret < 0) {
-			tp_log_err("%s: Failed to write F51_CTRL_04 register!\n",
-					__func__);
-			return ret;
-		}
-		tp_log_debug("%s: write reg value, f51_ctrl_04_val:0x%x \n", __func__, rmi4_data->f51_ctrl_04_val);
-		ret = synaptics_rmi4_i2c_write(rmi4_data,
-				PDT_P0_F01_RMI_CTRL_BASE+F01_CTRL_05_OFFSET,
-				&rmi4_data->f01_ctrl_05_val,
-				sizeof(rmi4_data->f01_ctrl_05_val));
-		if (ret < 0) {
-			tp_log_err("%s: Failed to write F01_CTRL_05 register!\n",
-					__func__);
-			return ret;
-		}
-		tp_log_debug("%s: write reg value, f01_ctrl_05_val:0x%x \n", __func__, rmi4_data->f01_ctrl_05_val);
-		ret = synaptics_rmi4_i2c_write(rmi4_data,
-				PDT_P0_F01_RMI_CTRL_BASE+F01_CTRL_09_OFFSET,
-				&rmi4_data->f01_ctrl_09_val,
-				sizeof(rmi4_data->f01_ctrl_09_val));
-		if (ret < 0) {
-			tp_log_err("%s: Failed to write F01_CTRL_09 register!\n",
-					__func__);
-			return ret;
-		}
-		tp_log_debug("%s: write reg value, f01_ctrl_09_val:0x%x \n", __func__, rmi4_data->f01_ctrl_09_val);
-		tp_log_debug("%s: write reg value, end\n", __func__);
-
-	} else { // set low sensitivity value, when holster was closed
-		tp_log_debug("%s: write reg value, begin(%d)\n", __func__, enabled);
-		ret = synaptics_rmi4_i2c_write(rmi4_data,
-				PDT_P4_F51_CUSTOM_CTRL_BASE+F51_CTRL_01_OFFSET,
-				&rmi4_data->f51_ctrl_01_low_sensitivity_val,
-				sizeof(rmi4_data->f51_ctrl_01_low_sensitivity_val));
-		if (ret < 0) {
-			tp_log_err("%s: Failed to write F51_CTRL_01 register!\n",
-					__func__);
-			return ret;
-		}
-		tp_log_debug("%s: write reg value, f51_ctrl_01_val:0x%x \n", __func__, rmi4_data->f51_ctrl_01_low_sensitivity_val);
-		ret = synaptics_rmi4_i2c_write(rmi4_data,
-				PDT_P4_F51_CUSTOM_CTRL_BASE+F51_CTRL_04_OFFSET,
-				&rmi4_data->f51_ctrl_04_low_sensitivity_val,
-				sizeof(rmi4_data->f51_ctrl_04_low_sensitivity_val));
-		if (ret < 0) {
-			tp_log_err("%s: Failed to write F51_CTRL_04 register!\n",
-					__func__);
-			return ret;
-		}
-		tp_log_debug("%s: write reg value, f51_ctrl_04_val:0x%x \n", __func__, rmi4_data->f51_ctrl_04_low_sensitivity_val);
-		ret = synaptics_rmi4_i2c_write(rmi4_data,
-				PDT_P0_F01_RMI_CTRL_BASE+F01_CTRL_05_OFFSET,
-				&rmi4_data->f01_ctrl_05_low_sensitivity_val,
-				sizeof(rmi4_data->f01_ctrl_05_low_sensitivity_val));
-		if (ret < 0) {
-			tp_log_err("%s: Failed to write F01_CTRL_05 register!\n",
-					__func__);
-			return ret;
-		}
-		tp_log_debug("%s: write reg value, f01_ctrl_05_val:0x%x \n", __func__, rmi4_data->f01_ctrl_05_low_sensitivity_val);
-		ret = synaptics_rmi4_i2c_write(rmi4_data,
-				PDT_P0_F01_RMI_CTRL_BASE+F01_CTRL_09_OFFSET,
-				&rmi4_data->f01_ctrl_09_low_sensitivity_val,
-				sizeof(rmi4_data->f01_ctrl_09_low_sensitivity_val));
-		if (ret < 0) {
-			tp_log_err("%s: Failed to write F01_CTRL_09 register!\n",
-					__func__);
-			return ret;
-		}
-		tp_log_debug("%s: write reg value, f01_ctrl_09_val:0x%x \n", __func__, rmi4_data->f01_ctrl_09_low_sensitivity_val);
-		tp_log_debug("%s: write reg value, end\n", __func__);
-	}
-	return ret;
-}
 /*Enable force calibration*/
 static int synaptics_force_cal(struct synaptics_rmi4_data *rmi4_data)
 {
@@ -1827,27 +1551,20 @@ static ssize_t synaptics_holster_func_store(struct device *dev,
 		*/
 		if(rmi4_data->glove_enabled == RMI4_GLOV_FUNC_ENABLED){
 			/*TP will response to finger and glove,with finger default*/
-			tp_log_debug("%s: line=%d\n",__func__,__LINE__);
 			ret = set_glove_mode(rmi4_data,SYSTEM_START_IN_SKIN_MODE);
 		} else {
 			/*TP will only response to finger*/
-			tp_log_debug("%s: line=%d\n",__func__,__LINE__);
 			ret = set_glove_mode(rmi4_data,SYSTEM_LOCKED_TO_SKIN_MODE);
 		}
 		if (ret < 0) {
 			tp_log_err("%s: Failed to set glove mode!ret=%d\n",
 					__func__,ret);
 			goto exit;
-		} else {
-			/* In case that glove mode has been changed by holster ui, we need */
-			/* to record ui state by another driver flag holster_enable_glove */
-			tp_log_warning("%s: line=%d\n",__func__,__LINE__);
-			holster_enable_glove = false;
 		}
-		/* when holster opened , set TP sensitivity to default */
-		ret = synaptics_set_holster_low_sensitivity(rmi4_data, 0);
+		/* Force calibrate to clear baseline */
+		ret = synaptics_force_cal(rmi4_data);
 		if (ret < 0) {
-			tp_log_err("%s: Failed to set holster low sensitivity!ret=%d\n",
+			tp_log_err("%s: Failed to force calibration!ret=%d\n",
 					__func__,ret);
 			goto exit;
 		}
@@ -1875,32 +1592,13 @@ static ssize_t synaptics_holster_func_store(struct device *dev,
 
 		/*Enable glove mode*/
 		/*TP will only response to finger with glove*/
-		tp_log_debug("%s: line=%d\n",__func__,__LINE__);
 		ret = set_glove_mode(rmi4_data,SYSTEM_LOCKED_TO_GLOVE_MODE);
 		if (ret < 0) {
 			tp_log_err("%s: Failed to set glove mode!ret=%d\n",
 					__func__,ret);
 			goto exit;
 		} else {
-			/* In case that glove mode has been set to 3 by holster ui, we need */
-			/* to record ui state by another driver flag holster_enable_glove */
-			holster_enable_glove = true;
 			tp_log_warning("%s: glove is Enabled!\n", __func__);
-		}
-		/* when holster was covered, force cal onec */
-		ret = synaptics_force_cal(rmi4_data);
-		if (ret < 0) {
-			tp_log_err("%s: Failed to force calibration!ret=%d\n",
-					__func__,ret);
-			goto exit;
-		}
-
-		/* when holster closed , set TP sensitivity to low*/
-		ret = synaptics_set_holster_low_sensitivity(rmi4_data, 1);
-		if (ret < 0) {
-			tp_log_err("%s: Failed to set holster low sensitivity!ret=%d\n",
-					__func__,ret);
-			goto exit;
 		}
 	}
 
@@ -2039,10 +1737,6 @@ static int add_easy_wakeup_interfaces(struct device *dev)
 				tp_log_err("%s: glove_func create file error\n", __func__);
 				return -ENODEV;
 			}
-		}
-		/*if dtsi enables the glove_edge_switch_supported, initialize the delayed work*/
-		if(true == rmi4_data->board->glove_edge_switch_supported){
-			INIT_DELAYED_WORK(&rmi4_data->glove_delay_work, synaptics_edge_glove_to_finger_delay_work);
 		}
 	}
 
@@ -3442,23 +3136,7 @@ static void synaptics_rmi4_sensor_report_delay_work(struct work_struct *work)
 
 	return;
 }
- static void synaptics_edge_glove_to_finger_delay_work(struct work_struct *work)
-{
-	int retval = 0;
-	struct synaptics_rmi4_data *rmi4_data = NULL;
-	rmi4_data = container_of(work, struct synaptics_rmi4_data, glove_delay_work.work);
 
-	/*disable glove mode to finger mode on the edge of TP*/
-	retval = set_edge_glove_state(rmi4_data, true);
-	if(retval < 0)
-	{
-		tp_log_err("%s: Failed to disable edge glove state\n",
-		__func__);
-	}
-	edge_glove_switch_process = false;
-
-	return;
-}
  /**
  * synaptics_rmi4_irq()
  *
@@ -4978,19 +4656,7 @@ static int synaptics_rmi4_reinit_device(struct synaptics_rmi4_data *rmi4_data)
 	if (retval < 0){
 		goto exit;
 	}
-	/**
-	 *if product dts supported grip algorithm and state of the grip algorithm 
-	 *is false ,we begin to set the grip algorithm edge distance
-	 */
-	if((true == rmi4_data->board->grip_algorithm_supported)
-		&&(false == grip_algorithm_state)){
-		retval = set_grip_algorithm_edge_distance(rmi4_data);
-		if(retval < 0){
-			tp_log_err("%s:failed to set grip algorithm edge distance! \n",__func__);
-			goto exit;
-		}
-		grip_algorithm_state = true;
-	}
+
 	if (!list_empty(&rmi->support_fn_list)) {
 		list_for_each_entry(fhandler, &rmi->support_fn_list, link) {
 			if (fhandler->fn_number == SYNAPTICS_RMI4_F12) {
@@ -5088,18 +4754,7 @@ static int synaptics_rmi4_reset_device(struct synaptics_rmi4_data *rmi4_data)
 		mutex_unlock(&(rmi4_data->rmi4_reset_mutex));
 		return retval;
 	}
-	/**
-	 *if product dts supported grip algorithm,
-	 *we begin to set the grip algorithm edge distance
-	 */
-	if(true == rmi4_data->board->grip_algorithm_supported){
-		retval = set_grip_algorithm_edge_distance(rmi4_data);
-		if(retval < 0){
-			tp_log_err("%s:failed to set grip algorithm edge distance! \n",__func__);
-			return retval;
-		}
-		grip_algorithm_state = true;
-	}
+
 	/* Refresh the default-dwt */
 	rmi4_data->dwt_default = command;
 	tp_log_debug("%s(line%d): rmi4_data->dwt_default = %d\n",__func__,__LINE__,rmi4_data->dwt_default);
@@ -5336,7 +4991,7 @@ static int setup_virtual_keys(struct device_node *dev_node,
 	/* TODO: Instantiate in board file and export it */
 	if (board_properties_kobj == NULL)
 		board_properties_kobj =
-			tp_get_virtual_key_obj("board_properties");
+			kobject_create_and_add("board_properties", NULL);
 	if (board_properties_kobj == NULL) {
 		tp_log_err("%s: Cannot get board_properties kobject!\n", __func__);
 		rc = -EINVAL;
@@ -5470,9 +5125,7 @@ static void synaptics_print_dtsi_info(struct synaptics_dsx_platform_data *pdata)
 	tp_log_debug("synaptics,lensone_dwt=%d\n", pdata->lensone_dwt);
 	tp_log_debug("synaptics,gis_dwt=%d\n", pdata->gis_dwt);
 	tp_log_debug("synaptics,yassy_dwt=%d\n", pdata->yassy_dwt);
-	tp_log_debug("synaptics,glove_edge_switch_supported=%d\n", pdata->glove_edge_switch_supported);
-	tp_log_debug("synaptics,grip_algorithm_supported=%d\n", pdata->grip_algorithm_supported);
-	tp_log_debug("synaptics,grip_algorithm_enabled=%d\n", pdata->grip_algorithm_enabled);
+	
 }
 
 static int synaptics_rmi4_parse_dt(struct device *dev, struct synaptics_dsx_platform_data *pdata)
@@ -5576,7 +5229,6 @@ static int synaptics_rmi4_parse_dt(struct device *dev, struct synaptics_dsx_plat
 
 	pdata->holster_supported = (bool)get_of_u32_val(np, "synaptics,holster_supported", 0);
 	pdata->esd_support = (bool)get_of_u32_val(np, "synaptics,esd_support", 0);
-	pdata->low_power_support = (bool)get_of_u32_val(np, "sybaptics,support_low_power_model", 0);
 	/* Doze wakeup threshold for gesture mode */
 	pdata->ofilm_dwt = get_of_u32_val(np, "synaptics,ofilm_dwt", 0);
 	pdata->junda_dwt = get_of_u32_val(np, "synaptics,junda_dwt", 0);
@@ -5585,13 +5237,7 @@ static int synaptics_rmi4_parse_dt(struct device *dev, struct synaptics_dsx_plat
 	pdata->lensone_dwt = get_of_u32_val(np, "synaptics,lensone_dwt", 0);
 	pdata->gis_dwt = get_of_u32_val(np, "synaptics,gis_dwt", 0);
 	pdata->yassy_dwt = get_of_u32_val(np, "synaptics,yassy_dwt", 0);
-	pdata->glove_edge_switch_supported= (bool)get_of_u32_val(np, "synaptics,glove_edge_switch_supported", 0);
-	pdata->grip_algorithm_supported= (bool)get_of_u32_val(np, "synaptics,grip_algorithm_supported", 0);
-	pdata->grip_algorithm_enabled= (bool)get_of_u32_val(np, "synaptics,grip_algorithm_enabled", 0);
-	pdata->grip_left_lsb= get_of_u32_val(np, "huawei,grip_left_lsb", 0);
-	pdata->grip_left_msb= get_of_u32_val(np, "huawei,grip_left_msb", 0);
-	pdata->grip_right_lsb= get_of_u32_val(np, "huawei,grip_right_lsb", 0x4c);
-	pdata->grip_right_msb= get_of_u32_val(np, "huawei,grip_right_msb", 0x04);
+
 	/*DEBUG: print tp dtsi info*/
 	synaptics_print_dtsi_info(pdata);
 	return 0;
@@ -5705,7 +5351,6 @@ void synaptics_dsx_hardware_reset(struct synaptics_rmi4_data *rmi4_data)
 	buf[ret] = 0x00;
 	if (!cdev){
 		tp_log_err("%s %d: device is null \n", __func__, __LINE__);
-		enable_irq(rmi4_data->irq);
 		return;
 	}
 	
@@ -5812,110 +5457,7 @@ void synaptics_dsx_hardware_reset(struct synaptics_rmi4_data *rmi4_data)
  
 	 return 0;
  }
-extern int get_product_module_name(unsigned char *product_id);
-static void synaptics_rmi4_read_default_glove_holster_sensitivity(struct synaptics_rmi4_data *rmi4_data)
-{
-	int ret;
-	int product_module_name = UNKNOW_PRODUCT_MODULE;
-	struct device_node *np = rmi4_data->i2c_client->dev.of_node;
-	struct device_node *dev_node = NULL;
-	struct synaptics_rmi4_device_info *rmi = &(rmi4_data->rmi4_mod_info);
-	char *product_id = rmi->product_id_string;
 
-	/*
-	   read glove/holster sensitivity register value for default
-	   the parameters was defined in synaptics_dsx_i2c.h in rmi4_data structure.
-	 */
-	ret = synaptics_rmi4_i2c_read(rmi4_data,
-			PDT_P4_F51_CUSTOM_CTRL_BASE+F51_CTRL_01_OFFSET,
-			&rmi4_data->f51_ctrl_01_val,
-			sizeof(rmi4_data->f51_ctrl_01_val));
-	if (ret < 0) {
-		tp_log_err("%s: Failed to read F51_CTRL_01 register!\n",
-				__func__);
-		goto error;
-	}
-	tp_log_debug("%s: read reg value, f51_ctrl_01_val:0x%x \n", __func__, rmi4_data->f51_ctrl_01_val);
-	ret = synaptics_rmi4_i2c_read(rmi4_data,
-			PDT_P4_F51_CUSTOM_CTRL_BASE+F51_CTRL_04_OFFSET,
-			&rmi4_data->f51_ctrl_04_val,
-			sizeof(rmi4_data->f51_ctrl_04_val));
-	if (ret < 0) {
-		tp_log_err("%s: Failed to read F51_CTRL_04 register!\n",
-				__func__);
-		goto error;
-	}
-	tp_log_debug("%s: read reg value, f51_ctrl_04_val:0x%x \n", __func__, rmi4_data->f51_ctrl_04_val);
-	ret = synaptics_rmi4_i2c_read(rmi4_data,
-			PDT_P0_F01_RMI_CTRL_BASE+F01_CTRL_05_OFFSET,
-			&rmi4_data->f01_ctrl_05_val,
-			sizeof(rmi4_data->f01_ctrl_05_val));
-	if (ret < 0) {
-		tp_log_err("%s: Failed to read F01_CTRL_05 register!\n",
-				__func__);
-		goto error;
-	}
-	tp_log_debug("%s: read reg value, f01_ctrl_05_val:0x%x \n", __func__, rmi4_data->f01_ctrl_05_val);
-	ret = synaptics_rmi4_i2c_read(rmi4_data,
-			PDT_P0_F01_RMI_CTRL_BASE+F01_CTRL_09_OFFSET,
-			&rmi4_data->f01_ctrl_09_val,
-			sizeof(rmi4_data->f01_ctrl_09_val));
-	if (ret < 0) {
-		tp_log_err("%s: Failed to read F01_CTRL_09 register!\n",
-				__func__);
-		goto error;
-	}
-	tp_log_debug("%s: read reg value, f01_ctrl_09_val:0x%x \n", __func__, rmi4_data->f01_ctrl_09_val);
-	tp_log_debug("%s: product_id:%s\n",__func__,product_id);
-	product_module_name = get_product_module_name(product_id);
-	if (product_module_name == UNKNOW_PRODUCT_MODULE) {
-		tp_log_err("%s: not able to get module name = %d\n",
-				__func__,product_module_name);
-		goto error;
-	}
-
-	switch(product_module_name) {
-		case FW_JUNDA:
-			dev_node= of_find_node_by_name(np, "huawei,junda");
-			break;
-		case FW_OFILM:
-			dev_node= of_find_node_by_name(np, "huawei,ofilm");
-			break;
-		case FW_TRULY:
-			dev_node= of_find_node_by_name(np, "huawei,truly");
-			break;
-		case FW_EELY:
-			dev_node= of_find_node_by_name(np, "huawei,eely");
-			break;
-		case FW_GIS:
-			dev_node= of_find_node_by_name(np, "huawei,gis");
-			break;
-		case FW_YASSY:
-			dev_node= of_find_node_by_name(np, "huawei,yassy");
-			break;
-		case FW_LENSONE:
-			dev_node= of_find_node_by_name(np, "huawei,lensone");
-			break;
-		default:
-			tp_log_err("%s: got failed,use default!\n",__func__);
-			goto error;
-	}
-
-	rmi4_data->f51_ctrl_01_low_sensitivity_val = get_of_u32_val(dev_node, "huawei,f51_ctrl_01_low_sensitivity_val", rmi4_data->f51_ctrl_01_val);
-	tp_log_debug("%s: read dtsi value, f51_ctrl_01_val:0x%x \n", __func__, rmi4_data->f51_ctrl_01_low_sensitivity_val);
-	rmi4_data->f51_ctrl_04_low_sensitivity_val = get_of_u32_val(dev_node, "huawei,f51_ctrl_04_low_sensitivity_val", rmi4_data->f51_ctrl_04_val);
-	tp_log_debug("%s: read dtsi value, f51_ctrl_04_val:0x%x \n", __func__, rmi4_data->f51_ctrl_04_low_sensitivity_val);
-	rmi4_data->f01_ctrl_05_low_sensitivity_val = get_of_u32_val(dev_node, "huawei,f01_ctrl_05_low_sensitivity_val", rmi4_data->f01_ctrl_05_val);
-	tp_log_debug("%s: read dtsi value, f01_ctrl_05_val:0x%x \n", __func__, rmi4_data->f01_ctrl_05_low_sensitivity_val);
-	rmi4_data->f01_ctrl_09_low_sensitivity_val = get_of_u32_val(dev_node, "huawei,f01_ctrl_09_low_sensitivity_val", rmi4_data->f01_ctrl_09_val);
-	tp_log_debug("%s: read dtsi value, f01_ctrl_09_val:0x%x \n", __func__, rmi4_data->f01_ctrl_09_low_sensitivity_val);
-
-	return;
-error:
-	tp_log_err("%s: read sensitivity value failed!\n",__func__);
-
-	return;
-}
 
  /**
  * synaptics_rmi4_probe()
@@ -5937,7 +5479,7 @@ static int synaptics_rmi4_probe(struct i2c_client *client,
 {
 	int retval;
 	int ret = 0;
-	int attr_count;
+	unsigned char attr_count;
 	struct synaptics_rmi4_data *rmi4_data;
 	struct synaptics_dsx_platform_data *platform_data =
 			client->dev.platform_data;
@@ -6130,12 +5672,12 @@ static int synaptics_rmi4_probe(struct i2c_client *client,
 	}
 
 	exp_data.workqueue = create_singlethread_workqueue("dsx_exp_workqueue");
-	if(NULL == exp_data.workqueue){
-		tp_log_err("%s: failed to create workqueue for initialization and removal of "
-						"synaptics module\n", __func__);
-		retval = -ENOMEM;
-		goto err_create_workqueue;
-	}
+	INIT_DELAYED_WORK(&exp_data.work, synaptics_rmi4_exp_fn_work);
+	exp_data.rmi4_data = rmi4_data;
+	exp_data.queue_work = true;
+	queue_delayed_work(exp_data.workqueue,
+			&exp_data.work,
+			msecs_to_jiffies(EXP_FN_WORK_DELAY_MS));
 
 #ifdef CONFIG_PM
 #ifdef CONFIG_PM_RUNTIME
@@ -6160,17 +5702,11 @@ static int synaptics_rmi4_probe(struct i2c_client *client,
 	if (retval < 0) {
 		tp_log_err( "%s: Error, easy wakeup init sysfs fail! \n",
 			__func__);
+		goto err_sysfs;
 	}
 
 	device_init_wakeup(&rmi4_data->input_dev->dev, 1);
 #endif /*USE_WAKEUP_GESTURE*/
-	/* The work should be queued after synaptics probed successfully*/
-	INIT_DELAYED_WORK(&exp_data.work, synaptics_rmi4_exp_fn_work);
-	exp_data.rmi4_data = rmi4_data;
-	exp_data.queue_work = true;
-	queue_delayed_work(exp_data.workqueue,
-			&exp_data.work,
-			msecs_to_jiffies(EXP_FN_WORK_DELAY_MS));
 	/*set touch flag. avoid to probe repeatly!*/
 	if(touch_hw_data.set_touch_probe_flag)
 	{
@@ -6198,7 +5734,7 @@ static int synaptics_rmi4_probe(struct i2c_client *client,
 		tp_log_info("%s %d, not open esd check, flag = %d.\n", __func__, 
 					__LINE__, platform_data->esd_support);
 	}
-	synaptics_rmi4_read_default_glove_holster_sensitivity(rmi4_data);
+	
 	return retval;
 
 err_sysfs:
@@ -6212,11 +5748,10 @@ err_sysfs:
 	pm_runtime_disable(&client->dev);
 #endif/*CONFIG_PM_RUNTIME*/
 #endif/*CONFIG_PM*/
-	/*no need to cancle work before init_delayed_work*/
-	//cancel_delayed_work_sync(&exp_data.work);
+	cancel_delayed_work_sync(&exp_data.work);
 	flush_workqueue(exp_data.workqueue);
 	destroy_workqueue(exp_data.workqueue);
-err_create_workqueue:
+
 	synaptics_rmi4_irq_enable(rmi4_data, false);
 err_enable_irq:
 err_init_pinctrl:
@@ -6495,30 +6030,6 @@ static int synaptics_set_nosleep_mode(struct synaptics_rmi4_data *rmi4_data,unsi
 	int retval;
 	unsigned char device_ctrl;
 
-	//if low power model supperted, no need to handle f01_ctrl_base_addr,
-	//the firmware will do it 
-	if (rmi4_data->board->low_power_support)
-	{
-		//cherry yassy firmware do not support low power model
-		retval = strcmp(rmi4_data->board->product_name, CHERRY_PRODUCT_NAME);
-
-		tp_log_debug("%s %d:product name:%s, Cherry name:%s\n", 
-						__func__, __LINE__, rmi4_data->board->product_name, CHERRY_PRODUCT_NAME);
-		tp_log_debug("%s %d:product_id:%s, yassy name:%s\n", 
-						__func__, __LINE__, rmi4_data->product_id, FW_YASSY_STR);
-		//if this product is cherry and the module name is yassy, 
-		//the product is not support low power model
-		if (!retval && (strstr(rmi4_data->product_id, FW_YASSY_STR) != NULL))
-		{
-			tp_log_debug("%s %d:Yassy not support low power\n", __func__, __LINE__);
-		}
-		else
-		{
-			tp_log_info("%s %d:Support low power\n", __func__, __LINE__);
-			return 0;	
-		}
-	}
-
 	/*Read F01_RMI_CTRL00 to get nosleep mode*/
 	retval = synaptics_rmi4_i2c_read(rmi4_data,
 			rmi4_data->f01_ctrl_base_addr,
@@ -6613,14 +6124,9 @@ static void synaptics_put_device_into_easy_wakeup(struct device *dev,struct syna
 
 	tp_log_debug("%s: glove_enabled=%d", __func__, rmi4_data->glove_enabled);
 	/*In easy wakeup mode,exit glove mode if app has enabled it */
-	/*In EmUi3.0, holster switch will also change glove state, so we also */
-	/* need to recognize this state by driver flag to exit glove mode for */
-	/* temporary, to make sure that gesture will only response to finger */
-	if ((RMI4_GLOV_FUNC_ENABLED == rmi4_data->glove_enabled)||
-		(true == holster_enable_glove))
+	if (RMI4_GLOV_FUNC_ENABLED == rmi4_data->glove_enabled)
 	{
 		/*TP will only response to finger in easy wakeup*/
-		tp_log_warning("%s: line=%d\n",__func__,__LINE__);
 		retval = set_glove_mode(rmi4_data,SYSTEM_LOCKED_TO_SKIN_MODE);
 		if (retval < 0) {
 			tp_log_err("%s: Failed to set glove mode!retval=%d\n",
@@ -7072,19 +6578,6 @@ static int synaptics_rmi4_rt_suspend(struct device *dev)
 	if (!rmi4_data->sensor_sleep) {
 		rmi4_data->touch_stopped = true;
 		synaptics_rmi4_irq_enable(rmi4_data, false);
-		/**
-		 * if product is G760 and glove state switch of edge is running ,
-		 * we need to cancel the delayed work for tp suspend
-		 * and set the glove state process of edge for false
-		 */
-		if((true == rmi4_data->board->glove_edge_switch_supported)&&(true == edge_glove_switch_process))
-		{
-			retval = cancel_delayed_work_sync(&rmi4_data->glove_delay_work);
-			if(retval < 0){
-				tp_log_err("%s %d: failed to cancel delayed work sync retval = %d\n", __func__, __LINE__, retval);
-			}
-			edge_glove_switch_process = false;
-		}
 #if USE_WAKEUP_GESTURE
 		synaptics_put_device_into_sleep(dev,rmi4_data);
 #else
@@ -7150,44 +6643,17 @@ static int synaptics_rmi4_rt_resume(struct device *dev)
 	 * If glove has been enabled by app before tp was sleep,
 	 * we should enable glove again when resume tp.
 	*/
-	/*In EmUi3.0, holster switch will also change glove state, so we also */
-	/* need to recognize this state by driver flag to restore glove mode, */
-	/* to make sure that glove is in the same mode as before suspend */
-	if ((RMI4_GLOV_FUNC_ENABLED == rmi4_data->glove_enabled)||
-		(true == holster_enable_glove))
+	if (RMI4_GLOV_FUNC_ENABLED == rmi4_data->glove_enabled)
 	{
 		if (true == rmi4_data->holster_enabled)
 		{
 			/*TP will only response to glove in holster mode*/
-			tp_log_debug("%s: line=%d\n",__func__,__LINE__);
 			retval = set_glove_mode(rmi4_data,SYSTEM_LOCKED_TO_GLOVE_MODE);
 		}
 		else
 		{
 			/*TP will response to finger and glove,with finger default*/
-			tp_log_debug("%s: line=%d\n",__func__,__LINE__);
 			retval = set_glove_mode(rmi4_data,SYSTEM_START_IN_SKIN_MODE);
-			/**
-			 * if product is G760 and glove state switch of edge is not running ,
-			 * we need to enable glove mode to finger mode on the edge of TP
-			 * and schedule a delayed work
-			 */
-			if((true == rmi4_data->board->glove_edge_switch_supported)&&(false == edge_glove_switch_process))
-			{
-				/*delete the invalid info log*/
-				/*enable glove mode to finger mode on the edge of TP*/
-				retval = set_edge_glove_state(rmi4_data, false);
-				if(retval < 0)
-				{
-					tp_log_err("%s: Failed to enable edge glove state\n",
-					__func__);
-				}
-				else
-				{
-					edge_glove_switch_process = true;
-					schedule_delayed_work(&rmi4_data->glove_delay_work, msecs_to_jiffies(DELAY_TIME_ENABLE_EDGE_GLOVE_SWITCH));
-				}
-			}
 		}
 	}
 

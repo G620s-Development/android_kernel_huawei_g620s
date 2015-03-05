@@ -1176,9 +1176,7 @@ static int battery_monitor_capacity_changed(struct bq27510_device_info *di)
     int curr_capacity = 0;
     int curr_temperature = 0;
     int bat_exist = 1;
-    /* Remove the code: int battery_voltage = 0 */
-    static int zero_level_count = 0;
-    int voltage_now = 0;
+    int battery_voltage = 0;
     union power_supply_propval val = {0};
 #ifdef CONFIG_HUAWEI_DSM
     unsigned long now_tm_sec = 0;
@@ -1211,10 +1209,19 @@ static int battery_monitor_capacity_changed(struct bq27510_device_info *di)
         }
         if ((bq_device != NULL) && (bq_device->charge_status == POWER_SUPPLY_STATUS_DISCHARGING))
         {
-            /* Remove the code of get battery voltage and fake cutoff capacity*/
             if(curr_capacity <= CUTOFF_LEVEL)
             {
-                curr_capacity = CUTOFF_LEVEL;
+                battery_voltage = bq27510_battery_voltage(di);
+                if(battery_voltage >= CUTOFF_VOLTAGE)
+                {
+                    curr_capacity = FAKE_CUTOFF_LEVEL;
+                }
+                else
+                {
+                    dev_info(di->dev,"poweroff_capacity = %d\n" "poweroff_voltage = %d\n",
+                             curr_capacity,battery_voltage);
+                    curr_capacity = CUTOFF_LEVEL;
+                }
             }
         }
     }
@@ -1299,29 +1306,6 @@ static int battery_monitor_capacity_changed(struct bq27510_device_info *di)
             start_tm_sec = 0;
     }
 #endif
-    if ((bq_device != NULL) && (bq_device->charge_status == POWER_SUPPLY_STATUS_CHARGING)
-        && (ZERO_LEVEL == curr_capacity)){
-        voltage_now = bq27510_battery_voltage(di);
-        if(ZERO_LEVEL_VOLTAGE <= voltage_now){
-            /* if capacity read from soc reg is 0% when charging and voltage is over 3350mV */
-            /* modify the capacity as 1% */
-            curr_capacity = 1;
-            zero_level_count = 0;
-            pr_info("curr_capacity = %d voltage_now = %d\n", curr_capacity, voltage_now);
-        }else{
-            if(ZERO_LEVEL_COUNT > zero_level_count++){
-                /* if zero_level_count is less than 10 times */
-                /* modify the capacity as 1% */
-                pr_info("zero_level_count is %d\n", zero_level_count);
-                curr_capacity = 1;
-            }else{
-                curr_capacity = ZERO_LEVEL;
-                zero_level_count = 0;
-            }
-       }
-    }else{
-        zero_level_count = 0;
-    }
     /*Only availability if the capacity changed*/
     if (curr_capacity != di->prev_capacity)
     {
@@ -1766,8 +1750,7 @@ static int bq27510_battery_suspend(struct i2c_client *client,
 {
     struct bq27510_device_info *di = i2c_get_clientdata(client);
     cancel_delayed_work_sync(&di->battery_monitor_work);
-    /*soc changes by step of 1% in battery_monitor_work after resume */
-    /*so remove the code: di->last_soc_unbound = true; */
+    di->last_soc_unbound = true;
     return 0;
 }
 

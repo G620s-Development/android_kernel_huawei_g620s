@@ -85,9 +85,9 @@ static struct msm_camera_i2c_reg_array lm3642_low_array[] = {
 
 static struct msm_camera_i2c_reg_array lm3642_high_array[] = {
 	{CURRENT_REGISTER, 0x08},//843.75mA
-	// The duration of high flash, 0x07 corresponds to 800ms.
-	//{FLASH_FEATURE_REGISTER, 0x07},
-	{FLASH_FEATURE_REGISTER, 0x0F},//flash ramp time 512us and flash timeout 800ms
+	// The duration of high flash, 0x05 corresponds to 600ms.
+	//{FLASH_FEATURE_REGISTER, 0x05},
+	{FLASH_FEATURE_REGISTER, 0x0D},//frash ramp time 512us and flash timeout 600ms
 	{ENABLE_REGISTER, MODE_BIT_FLASH | ENABLE_BIT_FLASH | EBABLE_BIT_IVFM},
 };
 
@@ -190,6 +190,11 @@ int msm_flash_lm3642_led_init(struct msm_led_flash_ctrl_t *fctrl)
 	//clear the err and unlock IC, this function must be called before read and write register
 	msm_flash_clear_err_and_unlock(fctrl);
 
+	gpio_set_value_cansleep(
+		power_info->gpio_conf->gpio_num_info->
+		gpio_num[SENSOR_GPIO_FL_NOW],
+		GPIO_OUT_LOW);
+
 	if (fctrl->flash_i2c_client && fctrl->reg_setting) {
 		rc = fctrl->flash_i2c_client->i2c_func_tbl->i2c_write_table(
 			fctrl->flash_i2c_client,
@@ -197,10 +202,6 @@ int msm_flash_lm3642_led_init(struct msm_led_flash_ctrl_t *fctrl)
 		if (rc < 0)
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 	}
-	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_NOW],
-		GPIO_OUT_LOW);
 	return rc;
 }
 
@@ -218,8 +219,10 @@ int msm_flash_lm3642_led_release(struct msm_led_flash_ctrl_t *fctrl)
 		return -EINVAL;
 	}
 
-	//clear the err and unlock IC, this function must be called before read and write register
-	msm_flash_clear_err_and_unlock(fctrl);
+	gpio_set_value_cansleep(
+		power_info->gpio_conf->gpio_num_info->
+		gpio_num[SENSOR_GPIO_FL_NOW],
+		GPIO_OUT_LOW);
 	if (fctrl->flash_i2c_client && fctrl->reg_setting) {
 		rc = fctrl->flash_i2c_client->i2c_func_tbl->i2c_write_table(
 			fctrl->flash_i2c_client,
@@ -227,10 +230,6 @@ int msm_flash_lm3642_led_release(struct msm_led_flash_ctrl_t *fctrl)
 		if (rc < 0)
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 	}
-	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_NOW],
-		GPIO_OUT_LOW);
 	return 0;
 }
 
@@ -278,6 +277,12 @@ int msm_flash_lm3642_led_low(struct msm_led_flash_ctrl_t *fctrl)
 	flashdata = fctrl->flashdata;
 	power_info = &flashdata->power_info;
 
+
+	gpio_set_value_cansleep(
+		power_info->gpio_conf->gpio_num_info->
+		gpio_num[SENSOR_GPIO_FL_NOW],
+		GPIO_OUT_HIGH);
+
 	//clear the err and unlock IC, this function must be called before read and write register
 	msm_flash_clear_err_and_unlock(fctrl);
 
@@ -288,10 +293,6 @@ int msm_flash_lm3642_led_low(struct msm_led_flash_ctrl_t *fctrl)
 		if (rc < 0)
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 	}
-	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_NOW],
-		GPIO_OUT_HIGH);
 
 	return rc;
 }
@@ -307,6 +308,11 @@ int msm_flash_lm3642_led_high(struct msm_led_flash_ctrl_t *fctrl)
 
 	power_info = &flashdata->power_info;
 
+	gpio_set_value_cansleep(
+		power_info->gpio_conf->gpio_num_info->
+		gpio_num[SENSOR_GPIO_FL_NOW],
+		GPIO_OUT_HIGH);
+
 	//clear the err and unlock IC, this function must be called before read and write register
 	msm_flash_clear_err_and_unlock(fctrl);
 
@@ -317,10 +323,6 @@ int msm_flash_lm3642_led_high(struct msm_led_flash_ctrl_t *fctrl)
 		if (rc < 0)
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 	}
-	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_NOW],
-		GPIO_OUT_HIGH);
 
 	return rc;
 }
@@ -339,6 +341,12 @@ int msm_torch_lm3642_led_on(struct msm_led_flash_ctrl_t *fctrl)
 	flashdata = fctrl->flashdata;
 	power_info = &flashdata->power_info;
 
+
+	gpio_set_value_cansleep(
+		power_info->gpio_conf->gpio_num_info->
+		gpio_num[SENSOR_GPIO_FL_NOW],
+		GPIO_OUT_HIGH);
+
 	//clear the err and unlock IC, this function must be called before read and write register
 	msm_flash_clear_err_and_unlock(fctrl);
 
@@ -349,13 +357,10 @@ int msm_torch_lm3642_led_on(struct msm_led_flash_ctrl_t *fctrl)
 		if (rc < 0)
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 	}
-	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_NOW],
-		GPIO_OUT_HIGH);
 
 	return rc;
 }
+
 static int msm_flash_lm3642_i2c_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {

@@ -35,8 +35,6 @@
 #define LOG_MAX_NUMBER 3
 #define MSG_MAX_SIZE 200
 
-#define CHARGE_ID "charge"
-
 #define CHARGE_ERROR_BASE	(8 << GROUP_SHIFT)
 #define TMEPERATURE_ERR		(1 << SUBGROUP_SHIFT)
 #define TMEPERATURE_OVERFLOW	(1)
@@ -45,7 +43,6 @@
 #define RECHARGE_ERR	(3 << SUBGROUP_SHIFT)
 #define CHARGER_ERR		(4 << SUBGROUP_SHIFT)
 #define BOOST_ERR		(5 << SUBGROUP_SHIFT)
-#define TRICKLE_CHARGE_ERR		(6 << SUBGROUP_SHIFT)
 
 /**
  * MSG_WRAPPER() - wrapper storage error message, then log it

@@ -136,8 +136,9 @@ extern void notify_bq24152_to_control_otg(bool enable);
 
 static int vdd_val[VDD_VAL_MAX];
 
-static u32 bus_freqs[USB_NUM_BUS_CLOCKS];	/* bimc, snoc, pcnoc clk */
-static char bus_clkname[USB_NUM_BUS_CLOCKS][20] = {"bimc_clk", "snoc_clk", "pcnoc_clk"};
+static u32 bus_freqs[USB_NUM_BUS_CLOCKS];	/* bimc, snoc, pcnoc clk */;
+static char bus_clkname[USB_NUM_BUS_CLOCKS][20] = {"bimc_clk", "snoc_clk",
+						"pcnoc_clk"};
 static bool bus_clk_rate_set;
 
 static int msm_hsusb_ldo_init(struct msm_otg *motg, int init)
@@ -2649,7 +2650,7 @@ static void msm_chg_detect_work(struct work_struct *w)
 		if (aca_enabled())
 			udelay(100);
 		msm_chg_enable_aca_intr(motg);
-		dev_info(phy->dev, "chg_type = %s\n",
+		dev_dbg(phy->dev, "chg_type = %s\n",
 			chg_to_string(motg->chg_type));
 		queue_work(system_nrt_wq, &motg->sm_work);
 		return;
@@ -2810,7 +2811,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 		pm_runtime_get_sync(otg->phy->dev);
 		motg->pm_done = 0;
 	}
-	pr_info("%s work\n", usb_otg_state_string(otg->phy->state));
+	pr_debug("%s work\n", usb_otg_state_string(otg->phy->state));
 	switch (otg->phy->state) {
 	case OTG_STATE_UNDEFINED:
 		msm_otg_reset(otg->phy);
@@ -2847,7 +2848,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			otg->phy->state = OTG_STATE_A_IDLE;
 			work = 1;
 		} else if (test_bit(B_SESS_VLD, &motg->inputs)) {
-			pr_info("b_sess_vld\n");
+			pr_debug("b_sess_vld\n");
 			switch (motg->chg_state) {
 			case USB_CHG_STATE_UNDEFINED:
 				msm_chg_detect_work(&motg->chg_work.work);
@@ -2904,8 +2905,9 @@ static void msm_otg_sm_work(struct work_struct *w)
 					break;
 				case USB_SDP_CHARGER:
 #ifdef CONFIG_HUAWEI_KERNEL
-					/* set current as soon as chg type detected */
-					msm_otg_notify_charger(motg, IDEV_CHG_MIN);
+					if (get_android_usb_none_mode()) {
+						msm_otg_notify_charger(motg, IDEV_CHG_MIN);
+					}
 #endif
 					msm_otg_start_peripheral(otg, 1);
 					otg->phy->state =
@@ -3623,7 +3625,7 @@ static void msm_otg_set_vbus_state(int online)
 	if (!init) {
 		init = true;
 		complete(&pmic_vbus_init);
-		pr_info("PMIC: BSV init complete\n");
+		pr_debug("PMIC: BSV init complete\n");
 		return;
 	}
 

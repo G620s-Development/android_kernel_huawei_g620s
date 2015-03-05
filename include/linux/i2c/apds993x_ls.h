@@ -142,14 +142,8 @@ struct apds993x_platform_data {
 #define APDS993X_LUX_MAX            30000
 #define APDS993X_PROX_MAX_ADC_VALUE 1022
 #define APDS993X_LOW_LUX 100
-#define APDS993X_SUNLIGHT_CHODATA (15000)
-#define APDS993X_SUNLIGHT_IRDATA  (10000)
-#define APDS993X_SUNLIGHT_AIEN       (0x10)
-#define APDS993X_SUNLIGHT_AEN         (0x2)
-#define APDS993X_SUNLIGHT_AINT       (0x10)
-#define APDS993X_SUNLIGHT_AVALID   (0x1)
-#define APDS993X_PVALID                        (0x2)
-#define APDS993X_PINT                            (0x20)
+#define APDS993X_SUNLIGHT_CHODATA 28416
+
 
 #define APDS993X_DF	52
 

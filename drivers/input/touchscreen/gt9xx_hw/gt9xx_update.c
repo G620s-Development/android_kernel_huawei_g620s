@@ -48,8 +48,9 @@
 #define GUP_REG_PID_VID             0x8140
 
 #define GUP_SEARCH_FILE_TIMES       50
-#define UPDATE_FILE_PATH_2          "/system/etc/firmware/"
-#define UPDATE_FILE_PATH_1          "/data/goodix_fw.bin"
+
+#define UPDATE_FILE_PATH_2          "/system/etc/firmware/goodix_fw_g620S.bin"
+#define UPDATE_FILE_PATH_1          "/data/goodix_fw_g620S.bin"
 #define CONFIG_FILE_PATH_1          "/data/_goodix_config_.cfg"     
 #define CONFIG_FILE_PATH_2          "/sdcard/_goodix_config_.cfg"   
 
@@ -113,8 +114,6 @@ u8 searching_file = 0;
 
 extern u8 config[GTP_CONFIG_MAX_LENGTH + GTP_ADDR_LENGTH];
 static char touch_info[50] = {0};
-unsigned char fw_update_path2_name[60] = "\0";
-unsigned char gup_fw_name[40] = "\0";
 extern void gtp_reset_guitar(struct i2c_client *client, s32 ms);
 extern s32  gtp_send_cfg(struct i2c_client *client);
 extern s32 gtp_read_version(struct i2c_client *, u16* );
@@ -812,14 +811,14 @@ static void gup_search_file(s32 search_type)
         
         if (search_type & AUTO_SEARCH_BIN)
         {
-            tp_log_debug("Search for %s, %s for fw update.(%d/%d)", UPDATE_FILE_PATH_1, fw_update_path2_name, i+1, GUP_SEARCH_FILE_TIMES);
+            tp_log_debug("Search for %s, %s for fw update.(%d/%d)", UPDATE_FILE_PATH_1, UPDATE_FILE_PATH_2, i+1, GUP_SEARCH_FILE_TIMES);
             pfile = filp_open(UPDATE_FILE_PATH_1, O_RDONLY, 0);
             if (IS_ERR(pfile))
             {
-                pfile = filp_open(fw_update_path2_name, O_RDONLY, 0);
+                pfile = filp_open(UPDATE_FILE_PATH_2, O_RDONLY, 0);
                 if (!IS_ERR(pfile))
                 {
-                    tp_log_info("Bin file: %s for fw update.", fw_update_path2_name);
+                    tp_log_info("Bin file: %s for fw update.", UPDATE_FILE_PATH_2);
                     got_file_flag |= BIN_FILE_READY;
                     update_msg.file = pfile;
                 }
@@ -2298,9 +2297,9 @@ exit_burn_fw_finish:
 }
 static void goodix_set_appinfo(void)
 {
-    u8 config_id;
-    int ret = 0;
-    struct goodix_ts_data *ts = NULL;
+	u8 config_id;
+	int ret = 0;
+	struct goodix_ts_data *ts = NULL;
     ts = i2c_get_clientdata(i2c_connect_client);
     /*get config version and set touch_panel info*/
     ret = gtp_i2c_read_dbl_check(ts->client, GTP_REG_CONFIG_DATA, &config_id, 1);
@@ -2313,58 +2312,12 @@ static void goodix_set_appinfo(void)
         {
             tp_log_err( "set_touch_chip_info error\n");
         }
-        tp_log_debug("%s read register 0x8047 success config_id=%d,line=%d \n",__func__,config_id,__LINE__);
+		tp_log_debug("%s read register 0x8047 success config_id=%d,line=%d \n",__func__,config_id,__LINE__);
     }
-    else
-    {
-        tp_log_err("%s : read register 0x8047 failed\n",__func__);
-    }
-}
-/* 0: ofilm, 1: new_ofilm*/
-static char * gup_get_module_name(u8 module_id)
-{
-    if (OFILM_ID == module_id)
-    {
-        return "ofilm";
-    }
-    else if(NEW_OFILM_ID == module_id)
-    {
-        return "new_ofilm";
-    }
-    else
-    {
-        return "unknow";
-    }
-}
-
-/* gup_get_fw_name: get fw path and name for upgrading TP fw*/
-static void gup_get_fw_name(struct goodix_ts_data *ts)
-{
-    char *module_name;
-
-    tp_log_info("%s : ts->fw_update = 0x%0x\n",__func__, ts->fw_update);
-    /*if fw update is 0xBE, ic Firmware is error, so return new_ofilm*/
-    if(GTP_FW_FORCE_UPDATE_FLAG != ts->fw_update){
-        module_name = "new_ofilm";
-    }
-    else{
-        module_name = gup_get_module_name(ts->sensor_id);
-    }
-
-    /*get goodix fw name by the module name*/
-    strncpy(gup_fw_name, "goodix", sizeof(gup_fw_name));
-    strncat(gup_fw_name, "_", 1);
-    strncat(gup_fw_name, module_name, strlen(module_name));
-    strncat(gup_fw_name, "_fw.bin", strlen("_fw.bin"));
-
-    /*get the position 2 of the fw file for fw automatic upgrades when boot*/
-    strncpy(fw_update_path2_name, UPDATE_FILE_PATH_2, sizeof(fw_update_path2_name));
-    strncat(fw_update_path2_name, gup_fw_name, strlen(gup_fw_name));
-
-    tp_log_warning("%s, fw_update_path2_name = %s ,LINE = %d\n", __func__, 
-                    fw_update_path2_name, __LINE__);
-
-    return;
+	else
+	{
+		tp_log_err("%s : read register 0x8047 failed\n",__func__);
+	}
 }
 s32 gup_update_proc(void *dir)
 {
@@ -2375,6 +2328,7 @@ s32 gup_update_proc(void *dir)
     st_fw_head fw_head;
     struct goodix_ts_data *ts = NULL;
     
+    tp_log_debug("[update_proc]Begin update ......\n");
     tp_log_info("%s start line=%d\n",__func__,__LINE__);
     ts = i2c_get_clientdata(i2c_connect_client);
     /*To protect the fw update,by adding the pm runtime*/
@@ -2407,7 +2361,7 @@ s32 gup_update_proc(void *dir)
         return gup_fw_download_proc(dir, GTP_FL_FW_BURN);
     }
 #endif
-    gup_get_fw_name(ts);
+
     update_msg.file = NULL;
     ret = gup_check_update_file(i2c_connect_client, &fw_head, dir);     //20121211
     if(FAIL == ret)
@@ -2426,9 +2380,10 @@ s32 gup_update_proc(void *dir)
     ret = gup_enter_update_judge(&fw_head);
     if(FAIL == ret)
     {
-        tp_log_warning("%s, no need to upgrade fw.\n", __func__);
+        tp_log_err("[update_proc]Check *.bin file fail.\n");
         goto file_fail;
     }
+    
     ts->enter_update = 1;
     gtp_irq_disable(ts);
 #if GTP_ESD_PROTECT

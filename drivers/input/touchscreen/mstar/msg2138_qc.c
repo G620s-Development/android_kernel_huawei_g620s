@@ -79,7 +79,6 @@ const int tpd_key_array[MAX_KEY_NUM] = { KEY_MENU, KEY_HOME, KEY_BACK };
 
 #define MSG2138_MENU_KEY_X_BASE   	400
 #define MSG2138_MENU_KEY_Y_BASE   	900
-#define READREG_RETRY_TIMES         20
 #endif
 
 #define WRITE_CHECK
@@ -95,13 +94,11 @@ static u8 curr_ic_type=CTP_ID_MSG21XXA;
 unsigned int g_focal_rst_gpio = 0;
 static int msg21xx_irq = 0;
 static struct input_dev *input=NULL;
+static struct i2c_client *msg21xx_i2c_client;
 static struct mutex msg21xx_mutex;
 static struct work_struct msg21xx_wq;
 
-//deleted by yanghaizhou 278208
-//these vars will be used in other files, so without "static"
-struct msg21xx_ts_data *msg21xx_data = NULL;
-struct i2c_client *msg21xx_i2c_client = NULL;
+struct i2c_client *g_i2c_client = NULL;
 
 static const char * MSG21XX_fw_update_bin = NULL;
 
@@ -180,6 +177,9 @@ struct class *firmware_class;
 struct device *firmware_cmd_dev;
 #endif
 #endif
+
+struct msg21xx_ts_data *msg21xx_data = NULL;
+
 
 typedef struct
 {
@@ -575,8 +575,10 @@ void drvDB_WriteReg(u8 bBank, u8 bAddr, u16 bData)
 {
     u8 bWriteData[5];
 	int old_i2c_freq = 0;
-	old_i2c_freq = qup_get_clk_freq(msg21xx_i2c_client->adapter);
-	qup_set_clk_freq(msg21xx_i2c_client->adapter, I2C_FREQUENCY_50000);
+	
+	old_i2c_freq = qup_get_clk_freq(g_i2c_client->adapter);
+	qup_set_clk_freq(g_i2c_client->adapter, I2C_FREQUENCY_50000);
+	
     bWriteData[0]=0x10;
     bWriteData[1] = bBank;
     bWriteData[2] = bAddr;
@@ -585,7 +587,7 @@ void drvDB_WriteReg(u8 bBank, u8 bAddr, u16 bData)
     mdelay(2);	
     HalTscrCDevWriteI2CSeq(FW_ADDR_MSG20XX, bWriteData, 5);
 	
-	qup_set_clk_freq(msg21xx_i2c_client->adapter, old_i2c_freq);
+	qup_set_clk_freq(g_i2c_client->adapter, old_i2c_freq);
 }
 
 void drvDB_WriteReg8Bit(u8 bBank, u8 bAddr, u8 bData)
@@ -593,8 +595,8 @@ void drvDB_WriteReg8Bit(u8 bBank, u8 bAddr, u8 bData)
 	u8 bWriteData[5];
 	int old_i2c_freq = 0;
 	
-	old_i2c_freq = qup_get_clk_freq(msg21xx_i2c_client->adapter);
-	qup_set_clk_freq(msg21xx_i2c_client->adapter, I2C_FREQUENCY_50000);
+	old_i2c_freq = qup_get_clk_freq(g_i2c_client->adapter);
+	qup_set_clk_freq(g_i2c_client->adapter, I2C_FREQUENCY_50000);
 	bWriteData[0] = 0x10;
 	bWriteData[1] = bBank;
 	bWriteData[2] = bAddr;
@@ -606,7 +608,7 @@ void drvDB_WriteReg8Bit(u8 bBank, u8 bAddr, u8 bData)
             tp_log_err("%s %d: HalTscrCDevWriteI2CSeq erro!\n", __func__, __LINE__);
         }
             
-	qup_set_clk_freq(msg21xx_i2c_client->adapter, old_i2c_freq);
+	qup_set_clk_freq(g_i2c_client->adapter, old_i2c_freq);
 }
 
 u16 drvDB_ReadReg(u8 bBank,u8 bAddr)
@@ -616,8 +618,8 @@ u16 drvDB_ReadReg(u8 bBank,u8 bAddr)
     u8 bReadData[2] = {0x00, 0x00};
 	int old_i2c_freq = 0;
 	
-	old_i2c_freq = qup_get_clk_freq(msg21xx_i2c_client->adapter);
-	qup_set_clk_freq(msg21xx_i2c_client->adapter, I2C_FREQUENCY_50000);
+	old_i2c_freq = qup_get_clk_freq(g_i2c_client->adapter);
+	qup_set_clk_freq(g_i2c_client->adapter, I2C_FREQUENCY_50000);
     mdelay(2);
     HalTscrCDevWriteI2CSeq(FW_ADDR_MSG20XX, bWriteData, 3);
 
@@ -625,10 +627,9 @@ u16 drvDB_ReadReg(u8 bBank,u8 bAddr)
     HalTscrCReadI2CSeq(FW_ADDR_MSG20XX, &bReadData[0], 2);
 
     val = (bReadData[1] << 8) | (bReadData[0]);
-	qup_set_clk_freq(msg21xx_i2c_client->adapter, old_i2c_freq);
+	qup_set_clk_freq(g_i2c_client->adapter, old_i2c_freq);
     return val;
 }
-
 
 u32 Reflect(u32 ref, char ch)//unsigned int Reflect(unsigned int ref, char ch)
 {
@@ -770,15 +771,13 @@ static u16 _GetVendorID ( EMEM_TYPE_t emem_type )
 
     //MCU run
     drvDB_WriteReg ( 0x0F, 0xE6, 0x0000 );
+
     //polling 0x3CE4
-    for(i=0;i<READREG_RETRY_TIMES;i++)
+    do
     {
-        mdelay(100);
-        reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );  //30ms 3t
-        if(0x5B58 == reg_data)
-            break;        
+        reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );
     }
-    tp_log_err("%s %d: drvDB_ReadReg,try times=%d\n", __func__, __LINE__,i+1);
+    while ( reg_data != 0x5B58 );
 
     if (emem_type == EMEM_MAIN)
     {
@@ -831,7 +830,6 @@ static void firmare_update_c33(void)
     u8 n = 0, i = 0, flag = 2; //2:main blk    1:all blk    3: info blk
 
     u32 j = 0;
-    u32 m = 0;
     u32 *crc_tab = NULL;
     u32 crc_main = 0, crc_main_tp, crc_temp = 0;
     u32 crc_info = 0, crc_info_tp = 0;
@@ -848,7 +846,6 @@ static void firmare_update_c33(void)
     }
 
     disable_irq_nosync(msg21xx_irq);
-    
 	_HalTscrHWReset();
 
     dbbusDWIICEnterSerialDebugMode();
@@ -872,14 +869,11 @@ static void firmare_update_c33(void)
     //polling 0x3CE4 is 0x1C70
     if ( ( flag == 1 ) || ( flag == 2 ) )
     {
-        for(i=0;i<READREG_RETRY_TIMES;i++)
+        do
         {
-          mdelay(100);
-          reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );   
-          if(0x1C70 == reg_data)
-            break;            
+            reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );
         }
-        tp_log_err("%s %d:drvDB_ReadReg,try times=%d\n", __func__, __LINE__,i+1);
+        while ( reg_data != 0x1C70 );
         tp_log_info("%s %d:EMEM UPDATE -> polling 0x3CE4 is 0x1C70\n", __func__, __LINE__);
     }
 
@@ -909,14 +903,11 @@ static void firmare_update_c33(void)
     }
 
     // polling 0x3CE4 is 0x2F43
-    for(i=0;i<READREG_RETRY_TIMES;i++)
+    do
     {
-        mdelay(100);
-        reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );  //48 t
-        if(0x2F43 == reg_data)
-        break;
+        reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );
     }
-    tp_log_err("%s %d: drvDB_ReadReg,try times=%d\n", __func__, __LINE__,i+1);
+    while ( reg_data != 0x2F43 );
 
     // calculate CRC 32
     Init_CRC32_Table ( &crc_tab[0] );
@@ -966,14 +957,11 @@ static void firmare_update_c33(void)
         }
 
         // polling 0x3CE4 is 0xD0BC
-        for(m=0;m<READREG_RETRY_TIMES;m++)
+        do
         {
-          mdelay(100);
-          reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );  //5ms 4t
-          if(0xD0BC == reg_data)
-             break;
+            reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );
         }
-        tp_log_err("%s %d: drvDB_ReadReg,try times=%d\n", __func__, __LINE__,m+1);
+        while ( reg_data != 0xD0BC );
         tp_log_info("%s %d:[21xxA]:EMEM UPDATE -> polling 0x3CE4 is 0xD0BC, CNT=%d\n", __func__, __LINE__, i);
 
         drvDB_WriteReg ( 0x3C, 0xE4, 0x2F43 );
@@ -988,14 +976,11 @@ static void firmare_update_c33(void)
     if ( ( flag == 1 ) || ( flag == 2 ) )
     {
         // polling 0x3CE4 is 0x9432
-        for(m=0;m<READREG_RETRY_TIMES;m++)
+        do
         {
-          mdelay(100);
-          reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );  //5ms 3t
-          if(0x9432 == reg_data)
-              break;          
+            reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );
         }
-         tp_log_err("%s %d: drvDB_ReadReg,try times=%d\n", __func__, __LINE__,m+1);
+        while ( reg_data != 0x9432 );
         tp_log_info("%s %d:EMEM UPDATE -> polling 0x3CE4 is 0x9432\n", __func__, __LINE__);
     }
 
@@ -2114,7 +2099,7 @@ static u32 _CalMainCRC32(void)
 {
     u32 ret = 0;
     u16  reg_data = 0;
-    u16 i = 0;
+
     _HalTscrHWReset();
 
     dbbusDWIICEnterSerialDebugMode();
@@ -2140,22 +2125,17 @@ static u32 _CalMainCRC32(void)
     drvDB_WriteReg ( 0x0F, 0xE6, 0x0000 );
 
     //polling 0x3CE4
-    for(i=0;i<READREG_RETRY_TIMES;i++)
+    do
     {
-        mdelay(100);
-        reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );  //30ms 3t//!!需要至少150ms
-        if(0x9432==reg_data)
-            break;        
+        reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );
     }
-    tp_log_err("%s %d: drvDB_ReadReg,try times=%d\n", __func__, __LINE__,i+1);
-
+    while ( reg_data != 0x9432 );
 
     // Cal CRC Main from TP
     ret = drvDB_ReadReg ( 0x3C, 0x80 );
     ret = ( ret << 16 ) | drvDB_ReadReg ( 0x3C, 0x82 );
 
-    tp_log_info("%s %d:Current main crc32=0x%x\n", __func__, __LINE__, ret);
-
+    tp_log_debug("%s %d:Current main crc32=0x%x\n", __func__, __LINE__, ret);
     return (ret);
 }
 
@@ -2193,14 +2173,11 @@ static u32 _ReadBinConfig ( void )
     drvDB_WriteReg ( 0x0F, 0xE6, 0x0000 );
 
     //polling 0x3CE4
-    for(i=0;i<READREG_RETRY_TIMES;i++)
+    do
     {
-      mdelay(50);
-      reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );  //5ms 3t
-      if(0x5B58==reg_data)
-          break;      
+        reg_data = drvDB_ReadReg ( 0x3C, 0xE4 );
     }
-    tp_log_err("%s %d: drvDB_ReadReg,try times=%d\n", __func__, __LINE__,i+1);
+    while ( reg_data != 0x5B58 );
 
     dbbus_tx_data[0] = 0x72;
     dbbus_tx_data[1] = 0x7F;
@@ -2223,7 +2200,6 @@ static u32 _ReadBinConfig ( void )
     ret = (ret << 8) | dbbus_rx_data[3];
 
     tp_log_info("%s %d:crc32 from bin config=%x\n", __func__, __LINE__, ret);
-
     return (ret);
 }
 
@@ -2850,9 +2826,10 @@ static int msg21xx_ts_probe(struct i2c_client *client, const struct i2c_device_i
         return 0;
     }
 
-    tp_log_info("%s %d:Probe start.\n", __func__, __LINE__);
+	tp_log_info("%s %d:Probe start.\n", __func__, __LINE__);
+    g_i2c_client = client;
     
-    if (!i2c_check_functionality(msg21xx_i2c_client->adapter, I2C_FUNC_I2C)) 
+	if (!i2c_check_functionality(msg21xx_i2c_client->adapter, I2C_FUNC_I2C)) 
     {
         tp_log_err("%s %d:I2C check functionality failed.", __func__, __LINE__);
         ret = -ENODEV;
@@ -3035,7 +3012,6 @@ static int msg21xx_ts_probe(struct i2c_client *client, const struct i2c_device_i
     setup_timer(&msg->esd_timer, msg21xx_esd_timer, (unsigned long)msg);
 
     enable_irq(msg21xx_irq);
-    
     INIT_DELAYED_WORK(&msg21xx_data->firmware_update_work, msg21xx_firmware_auto_upgrade);
     schedule_delayed_work(&msg21xx_data->firmware_update_work, msecs_to_jiffies(MSG21XX_UPDATE_WAIT_TIMEOUT));
     tp_log_info("%s %d:Probe success.\n", __func__, __LINE__);

@@ -3405,7 +3405,17 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	msm_host->mmc->caps |= msm_host->pdata->mmc_bus_width;
 	msm_host->mmc->caps |= msm_host->pdata->caps;
 	msm_host->mmc->caps2 |= msm_host->pdata->caps2;
-	msm_host->mmc->caps2 |= MMC_CAP2_CORE_RUNTIME_PM;
+
+#ifdef CONFIG_HUAWEI_KERNEL
+    if(!strcmp(mmc_hostname(msm_host->mmc), "mmc1")){
+        pr_info("remove sdcard PM RUNTIME\n");
+    }
+    else{
+        msm_host->mmc->caps2 |= MMC_CAP2_CORE_RUNTIME_PM;
+    }
+#else
+    msm_host->mmc->caps2 |= MMC_CAP2_CORE_RUNTIME_PM;
+#endif
 	msm_host->mmc->caps2 |= MMC_CAP2_PACKED_WR;
 	msm_host->mmc->caps2 |= MMC_CAP2_PACKED_WR_CONTROL;
 	msm_host->mmc->caps2 |= (MMC_CAP2_BOOTPART_NOACC |

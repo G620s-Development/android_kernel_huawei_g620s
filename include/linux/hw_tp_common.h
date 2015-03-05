@@ -47,7 +47,6 @@ struct holster_mode{
 };
 
 struct kobject* tp_get_touch_screen_obj(void);
-struct kobject* tp_get_virtual_key_obj(char *name);
 struct kobject* tp_get_glove_func_obj(void);
 
 /* delete the func declare */

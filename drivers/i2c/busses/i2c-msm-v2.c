@@ -75,7 +75,7 @@ static int  i2c_msm_fifo_create_struct(struct i2c_msm_ctrl *ctrl);
 static int  i2c_msm_bam_create_struct(struct i2c_msm_ctrl *ctrl);
 static int  i2c_msm_blk_create_struct(struct i2c_msm_ctrl *ctrl);
 static void i2c_msm_clk_path_init(struct i2c_msm_ctrl *ctrl);
-static void i2c_msm_recover_bus_busy(struct i2c_msm_ctrl *ctrl);
+
 /* i2c_msm_bam_get_struct: return the bam structure
  * if not created, call i2c_msm_bam_create_struct to create it
  */
@@ -2306,6 +2306,13 @@ static int i2c_msm_bam_init(struct i2c_msm_ctrl *ctrl)
 
 	if (bam->is_init)
 		return 0;
+
+	ret = (*ctrl->ver.init)(ctrl);
+	if (ret) {
+		dev_err(ctrl->dev, "error on initializing QUP registers\n");
+		return ret;
+	}
+
 	i2c_msm_dbg(ctrl, MSM_DBG, "initializing BAM@0x%p", bam);
 
 	if (bam->is_core_init)
@@ -2715,7 +2722,6 @@ static irqreturn_t i2c_msm_qup_isr(int irq, void *devid)
 	bool dump_details    = false;
 	bool log_event       = false;
 	bool signal_complete = false;
-	bool need_wmb        = false;
 
 	i2c_msm_prof_evnt_add(ctrl, MSM_PROF, i2c_msm_prof_dump_irq_begn,
 								irq, 0, 0);
@@ -2728,6 +2734,31 @@ static irqreturn_t i2c_msm_qup_isr(int irq, void *devid)
 	i2c_status  = readl_relaxed(base + QUP_I2C_STATUS);
 	err_flags   = readl_relaxed(base + QUP_ERROR_FLAGS);
 	qup_op      = readl_relaxed(base + QUP_OPERATIONAL);
+	i2c_msm_dbg(ctrl, MSM_DBG,
+	    "IRQ MASTER_STATUS:0x%08x ERROR_FLAGS:0x%08x OPERATIONAL:0x%08x\n",
+	    i2c_status, err_flags, qup_op);
+
+	/* clear interrupts fields */
+	clr_flds = i2c_status & QUP_MSTR_STTS_ERR_MASK;
+	if (clr_flds)
+		writel_relaxed(clr_flds, base + QUP_I2C_STATUS);
+
+	clr_flds = err_flags & QUP_ERR_FLGS_MASK;
+	if (clr_flds)
+		writel_relaxed(clr_flds,  base + QUP_ERROR_FLAGS);
+
+	clr_flds = qup_op & (QUP_OUTPUT_SERVICE_FLAG | QUP_INPUT_SERVICE_FLAG);
+
+	if (clr_flds)
+		writel_relaxed(clr_flds, base + QUP_OPERATIONAL);
+	mb();
+
+	if (err_flags & QUP_ERR_FLGS_MASK) {
+		//disable dump for i2c crash issue
+		dump_details    = false;
+		signal_complete = true;
+		log_event       = true;
+	}
 
 	if (i2c_status & QUP_MSTR_STTS_ERR_MASK) {
 		signal_complete = true;
@@ -2751,54 +2782,7 @@ static irqreturn_t i2c_msm_qup_isr(int irq, void *devid)
 		if (i2c_status & QUP_BUS_ERROR)
 			ctrl->xfer.err |= I2C_MSM_ERR_BUS_ERR;
 	}
-	
-	/* check for FIFO over/under runs error */
-	if (err_flags & QUP_ERR_FLGS_MASK)
-		ctrl->xfer.err |= I2C_MSM_ERR_OVR_UNDR_RUN;
 
-	/* Reset and bail out on error */
-	if (ctrl->xfer.err) {
-	/* Dump the register values before reset the core */
-	if (ctrl->dbgfs.dbg_lvl >= MSM_DBG)
-		i2c_msm_dbg_qup_reg_dump(ctrl);
-
-	/* Flush for the tags in case of an error and BAM Mode*/
-	if (ctrl->xfer.mode_id == I2C_MSM_XFER_MODE_BAM)
-		writel_relaxed(QUP_I2C_FLUSH, ctrl->rsrcs.base + QUP_STATE);
-
-	/* HW workaround: when interrupt is level triggerd, more
-	* than one interrupt may fire in error cases. Thus we
-	* reset the core immidiatly in the ISR to ward off the
-	* next interrupt.
-	*/
-	i2c_msm_qup_sw_reset(ctrl);
-
-	need_wmb        = true;
-	signal_complete = true;
-	log_event       = true;
-	goto isr_end;
-	}
-
-	/* clear interrupts fields */
-	clr_flds = i2c_status & QUP_MSTR_STTS_ERR_MASK;
-	if (clr_flds) {
-		writel_relaxed(clr_flds, base + QUP_I2C_STATUS);
-		need_wmb = true;
-	}
-
-	clr_flds = err_flags & QUP_ERR_FLGS_MASK;
-	if (clr_flds) {
-		writel_relaxed(clr_flds,  base + QUP_ERROR_FLAGS);
-		need_wmb = true;
-	}
-
-	clr_flds = qup_op & (QUP_OUTPUT_SERVICE_FLAG | QUP_INPUT_SERVICE_FLAG);
-	if (clr_flds) {
-		writel_relaxed(clr_flds, base + QUP_OPERATIONAL);
-		need_wmb = true;
-	}
-
-	/* handle data completion */
 	if (xfer->mode_id == I2C_MSM_XFER_MODE_BLOCK) {
 		/*For Block Mode */
 		blk = i2c_msm_blk_get_struct(ctrl);
@@ -2858,10 +2842,7 @@ static irqreturn_t i2c_msm_qup_isr(int irq, void *devid)
 		i2c_msm_dbg_xfer_dump(ctrl);
 		i2c_msm_dbg_qup_reg_dump(ctrl);
 	}
-isr_end:
-	/* Ensure that QUP configuration is written before leaving this func */
-	if (need_wmb)
-		wmb();
+
 	if (dump_details || log_event || (ctrl->dbgfs.dbg_lvl >= MSM_DBG))
 		i2c_msm_prof_evnt_add(ctrl, MSM_PROF,
 					i2c_msm_prof_dump_irq_end,
@@ -2988,41 +2969,33 @@ static void i2c_msm_qup_teardown(struct i2c_msm_ctrl *ctrl)
 
 static int i2c_msm_qup_post_xfer(struct i2c_msm_ctrl *ctrl, int err)
 {
+	bool need_reset = false;
+
 	/* poll until bus is released */
 	if (i2c_msm_qup_poll_bus_active_unset(ctrl)) {
 		if ((ctrl->xfer.err & I2C_MSM_ERR_ARB_LOST) ||
-		    (ctrl->xfer.err & I2C_MSM_ERR_BUS_ERR) ||
-		    !(ctrl->xfer.err & I2C_STATUS_BUS_MASTER)){
+		    (ctrl->xfer.err & I2C_MSM_ERR_BUS_ERR)) {
 			if (i2c_msm_qup_slv_holds_bus(ctrl))
-			{
-				dev_err(ctrl->dev,"i2c bus is holded by slv\n");
 				i2c_msm_qup_do_bus_clear(ctrl);
-				i2c_msm_recover_bus_busy(ctrl);
-			}
-			/* do not generalize error to EIO if its already set */
+
 			if (!err)
 				err = -EIO;
 		}
 	}
-	/* flush bam data and reset the qup core in timeout error.
-	* for other error case, its handled by the ISR
-	*/
-	if (ctrl->xfer.err & I2C_MSM_ERR_TIMEOUT) {
-		/* Flush for the BAM registers */
-		if (ctrl->xfer.mode_id == I2C_MSM_XFER_MODE_BAM)
-			writel_relaxed(QUP_I2C_FLUSH, ctrl->rsrcs.base
-					+ QUP_STATE);
 
-		/* reset the sw core */
-		i2c_msm_qup_sw_reset(ctrl);
+	if (ctrl->xfer.err & I2C_MSM_ERR_TIMEOUT) {
 		err = -ETIMEDOUT;
+		need_reset = true;
 	}
-	if (ctrl->xfer.err & I2C_MSM_ERR_BUS_ERR) {
-		if (!err)
-		err = -EIO;
-	}
-	if (ctrl->xfer.err & I2C_MSM_ERR_NACK)
+
+	if (ctrl->xfer.err & I2C_MSM_ERR_NACK) {
+		writel_relaxed(QUP_I2C_FLUSH,  ctrl->rsrcs.base + QUP_STATE);
 		err = -ENOTCONN;
+		need_reset = true;
+	}
+
+	if (need_reset)
+		i2c_msm_qup_init(ctrl);
 
 	return err;
 }
@@ -3641,26 +3614,22 @@ static int i2c_msm_rsrcs_gpio_pinctrl_init(struct i2c_msm_ctrl *ctrl)
 
 	ctrl->rsrcs.gpio_state_suspend =
 		i2c_msm_rsrcs_gpio_get_state(ctrl, I2C_MSM_PINCTRL_SUSPEND);
-	ctrl->rsrcs.gpio_state_defult = 
-		i2c_msm_rsrcs_gpio_get_state(ctrl, I2C_MSM_PINCTRL_DEFULT);
+
 	return 0;
 }
 
 static void i2c_msm_pm_pinctrl_state(struct i2c_msm_ctrl *ctrl,
-				enum i2c_msm_pinctl_state pinctl_state)
+				bool runtime_active)
 {
 	struct pinctrl_state *pins_state;
 	const char           *pins_state_name;
 
-	if (pinctl_state == I2C_MSM_DFS_ACTIVE) {
+	if (runtime_active) {
 		pins_state      = ctrl->rsrcs.gpio_state_active;
 		pins_state_name = I2C_MSM_PINCTRL_ACTIVE;
-	} else if(pinctl_state == I2C_MSM_DFS_SUSPEND){
+	} else {
 		pins_state      = ctrl->rsrcs.gpio_state_suspend;
 		pins_state_name = I2C_MSM_PINCTRL_SUSPEND;
-	}else if(pinctl_state == I2C_MSM_DFS_DEFULT){
-		pins_state      = ctrl->rsrcs.gpio_state_defult;
-		pins_state_name = I2C_MSM_PINCTRL_DEFULT;
 	}
 
 	if (!IS_ERR_OR_NULL(pins_state)) {
@@ -3674,35 +3643,6 @@ static void i2c_msm_pm_pinctrl_state(struct i2c_msm_ctrl *ctrl,
 			"error pinctrl state-name:'%s' is not configured\n",
 			pins_state_name);
 	}
-}
-
-static void i2c_msm_recover_bus_busy(struct i2c_msm_ctrl *ctrl)
-{
-		void __iomem        *base = ctrl->rsrcs.base;	
-		uint32_t status = readl_relaxed(base + QUP_I2C_STATUS);	
-		int i = 0;
-		dev_info(ctrl->dev, " start of i2c_msm_recover_bus_busy\n");
-		if ((status & (I2C_STATUS_BUS_ACTIVE)) && (status & (I2C_STATUS_BUS_MASTER)))	
-		{
-			dev_err(ctrl->dev, "i2c bus has been recoveryed now\n");
-			return;	
-		}
-	
-		disable_irq(ctrl->rsrcs.irq);	
-		for(i = 0;i < I2C_MSM_RECOVERY_BUS_TIMES;i++){
-			i2c_msm_pm_pinctrl_state(ctrl,I2C_MSM_DFS_DEFULT);
-			status = readl_relaxed(base + QUP_I2C_STATUS);	
-			if ((status & (I2C_STATUS_BUS_ACTIVE)) && (status & (I2C_STATUS_BUS_MASTER))) {		
-				dev_err(ctrl->dev, "Bus busy cleared after %d clock cycles, "			 
-				"status %x\n",			 
-				i, status);		
-				goto recovery_end;	
-			}
-		}
-
-recovery_end:	
-	enable_irq(ctrl->rsrcs.irq);
-	dev_info(ctrl->dev, " end of i2c_msm_recover_bus_busy\n");
 }
 
 /*
@@ -3917,7 +3857,7 @@ static void i2c_msm_pm_suspend(struct device *dev)
 		return;
 	}
 	i2c_msm_dbg(ctrl, MSM_DBG, "suspending...");
-	i2c_msm_pm_pinctrl_state(ctrl, I2C_MSM_DFS_SUSPEND);
+	i2c_msm_pm_pinctrl_state(ctrl, false);
 	i2c_msm_clk_path_unvote(ctrl);
 	ctrl->pwr_state = MSM_I2C_PM_SUSPENDED;
 	return;
@@ -3933,7 +3873,7 @@ static int i2c_msm_pm_resume(struct device *dev)
 	i2c_msm_dbg(ctrl, MSM_DBG, "resuming...");
 
 	i2c_msm_clk_path_vote(ctrl);
-	i2c_msm_pm_pinctrl_state(ctrl, I2C_MSM_DFS_ACTIVE);
+	i2c_msm_pm_pinctrl_state(ctrl, true);
 	ctrl->pwr_state = MSM_I2C_PM_ACTIVE;
 	return 0;
 }

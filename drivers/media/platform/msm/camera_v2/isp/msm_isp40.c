@@ -27,17 +27,7 @@
 #ifdef CONFIG_MSM_ISP_DBG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
 #else
-#ifdef CONFIG_HUAWEI_KERNEL
-#define CDBG(fmt, args...)          \
-do{                                 \
-    if(huawei_cam_is_factory_mode())\
-    {                               \
-        pr_err(fmt, ##args);        \
-    }                               \
-}while(0)
-#else
 #define CDBG(fmt, args...) do { } while (0)
-#endif
 #endif
 
 /* STATS_SIZE (BE + BG + BF+ RS + CS + IHIST + BHIST ) = 392 */

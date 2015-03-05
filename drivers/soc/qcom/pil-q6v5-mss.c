@@ -38,15 +38,6 @@
 #ifdef CONFIG_HUAWEI_KERNEL
 #include <linux/sched.h>
 #endif
- 
-#ifdef CONFIG_HUAWEI_KERNEL
-#include<linux/store_exception.h>
-#define MODEM_EXCEPTION_FILENAME  "modem_exception"
-#endif
-
-#ifdef CONFIG_HUAWEI_KERNEL
-#include <linux/slab.h>
-#endif
 
 #include <soc/qcom/subsystem_restart.h>
 #include <soc/qcom/ramdump.h>
@@ -62,91 +53,8 @@
 #define MAX_SSR_REASON_LEN	81U
 #define STOP_ACK_TIMEOUT_MS	1000
 
-#ifdef CONFIG_HUAWEI_KERNEL
-#define SSR_REASON_LEN	MAX_SSR_REASON_LEN
-#endif
-
 #define subsys_to_drv(d) container_of(d, struct modem_data, subsys_desc)
 
-#ifdef CONFIG_HUAWEI_KERNEL
-
-/* define work data sturct*/
-struct work_data{
-       struct work_struct log_modem_reset_work; //WORK
-       char reset_reason[SSR_REASON_LEN];
-};
-//struct work_struct log_modem_work; //used to fill the temp work
-struct workqueue_struct *log_modem_reset_work_queue = NULL; //WORK QUEUE
-
-/*creat the queue that log the modem reset reason*/
-int log_modem_queue_create(void)
-{
-    int error = 0;
-
-    log_modem_reset_work_queue = create_singlethread_workqueue("log_modem_reset");
-
-    if (NULL == log_modem_reset_work_queue) {
-        error = -ENOMEM;
-        pr_err("[log_modem_reset]log modem reset queue created failed !!!!\n");
-        return error;
-    }
-
-    pr_info("[log_modem_reset]log modem reset queue created success \n");
-    return error;
-}
-
-/*the queue work handle, store the modem reason to the exception file*/
-static void log_modem_reset_work_func(struct work_struct *work)
-{
-
-    struct work_data *work_data_self = container_of(work,struct work_data,log_modem_reset_work);
-    if(NULL == work_data_self)
-	{
-         pr_err("[log_modem_reset]work_data_self is NULL !!!!\n");
-         return;  
-	}
-    store_exception(MODEM_EXCEPTION_FILENAME, work_data_self->reset_reason);
-    pr_info("[log_modem_reset]log_modem_reset_work after write exception inode work_data_self->reset_reason=%s \n",work_data_self->reset_reason);
-    kfree(work_data_self);
-}
-
-//parameters name---log_modem_reset======sign related the quue log_modem_reset_work_queue
-//parameters function-----log_modem_reset_work========the work will be handle by work_queue
-//static DECLARE_WORK(log_modem_reset,log_modem_reset_work);
-int log_modem_reset_queue(char *reason)
-{
-    int error = 0;
-
-    struct work_data *work_data_temp = kzalloc(sizeof(struct work_data),GFP_KERNEL);
-    if(NULL == work_data_temp)
-    {
-         pr_err("[log_modem_reset]work_data_temp is NULL, Don't log this !!!!!!!\n");
-         error = -ENOMEM;
-         return error;
-    }
-
-	//fill the reason
-    strncpy(work_data_temp->reset_reason,reason,SSR_REASON_LEN-1);
-    //work_data_temp->reset_reason[SSR_REASON_LEN-1]='\0';
-
-    //fill the work
-    //work_data_temp->log_modem_reset_work = log_modem_work;
-
-   //insert the work to the queue
-   if(NULL != log_modem_reset_work_queue)
-   {
-       INIT_WORK(&(work_data_temp->log_modem_reset_work),log_modem_reset_work_func);
-       queue_work(log_modem_reset_work_queue,&(work_data_temp->log_modem_reset_work));
-       pr_info("[log_modem_reset]modem reset reason inserted the log_modem_reset_queue \n");
-   }else{
-       error = -ENOMEM;
-       pr_err("[log_modem_reset]log_modem_reset_work_queue is NULL, return !!!!!!!\n");
-   }
-   return error;
-}
-
-
-#endif
 static void log_modem_sfr(void)
 {
 	u32 size;
@@ -168,15 +76,10 @@ static void log_modem_sfr(void)
 	pr_err("modem subsystem failure reason: %s.\n", reason);
 
 #ifdef CONFIG_HUAWEI_KERNEL
-	if(strstr(reason,"request modem by huawei")||strstr(reason,"cm_hw_request_modem_reset"))
+	if(strstr(reason,"request modem by huawei"))
 	{
-		pr_err("reset modem subsystem by huawei\n");
-		subsystem_restart_requested = 1;
-	}else
-	{
-		pr_info("[log_modem_reset]put the reset modem reason insert into the queue \n");
-		log_modem_reset_queue(reason);
-		pr_info("[log_modem_reset]put done \n");
+           pr_err("reset modem subsystem by huawei\n");
+	   subsystem_restart_requested = 1;
 	}
 #endif
 	smem_reason[0] = '\0';
@@ -346,10 +249,6 @@ static int pil_subsys_init(struct modem_data *drv,
 		ret = PTR_ERR(drv->subsys);
 		goto err_subsys;
 	}
-
-#ifdef CONFIG_HUAWEI_KERNEL
-	log_modem_queue_create();
-#endif
 
 	drv->ramdump_dev = create_ramdump_device("modem", &pdev->dev);
 	if (!drv->ramdump_dev) {

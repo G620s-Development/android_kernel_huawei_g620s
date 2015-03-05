@@ -38,8 +38,8 @@
 #define OV5648_FOXCONN_SC0602_RG_RATIO_TYPICAL 0x2da
 #define OV5648_FOXCONN_SC0602_BG_RATIO_TYPICAL 0x2c3
 //5M s5k4e1 Sunny
-#define S5K4E1_SUNNY_P5S07A_RG_RATIO_TYPICAL 0x317
-#define S5K4E1_SUNNY_P5S07A_BG_RATIO_TYPICAL 0x2AE
+#define S5K4E1_SUNNY_P5S07A_RG_RATIO_TYPICAL 0x312
+#define S5K4E1_SUNNY_P5S07A_BG_RATIO_TYPICAL 0x2DE
 
 #define OV13850_SUNNY_P13V01H_RG_RATIO_TYPICAL  0x248
 #define OV13850_SUNNY_P13V01H_BG_RATIO_TYPICAL  0x257
@@ -52,17 +52,6 @@
 #define S5K4E1_SUNNY_132_BG_RATIO_TYPICAL            0x2b1
 #define OV5648_FOXCONN_132_RG_RATIO_TYPICAL          0x278
 #define OV5648_FOXCONN_132_BG_RATIO_TYPICAL          0x2d2
-#define OV5670_BYD_CHT854B_RG_RATIO_TYPICAL         0x0275  
-#define OV5670_BYD_CHT854B_BG_RATIO_TYPICAL         0x02a3 
-
-#define S5K5E2_OFILM_OHW5F02_RG_RATIO_TYPICAL         0x035c  
-#define S5K5E2_OFILM_OHW5F02_BG_RATIO_TYPICAL         0x02b8   
-
-#define OV5648_OFILM_OHW5F03_RG_RATIO_TYPICAL         0x02e8
-#define OV5648_OFILM_OHW5F03_BG_RATIO_TYPICAL         0x0312
-#define S5K5E2_FOXCONN_HC0806_RG_RATIO_TYPICAL		0x2e4
-#define S5K5E2_FOXCONN_HC0806_BG_RATIO_TYPICAL		0x283
-
 struct otp_function_t otp_function_lists []=
 {
 	{
@@ -147,41 +136,6 @@ struct otp_function_t otp_function_lists []=
 		OV5648_FOXCONN_132_BG_RATIO_TYPICAL,
 		false,
 	},
-	{
-		"ov5648_ofilm_ohw5f03",
-		ov5648_ofilm_ohw5f03_otp_func,
-		OV5648_OFILM_OHW5F03_RG_RATIO_TYPICAL,
-		OV5648_OFILM_OHW5F03_BG_RATIO_TYPICAL,
-		false,
-	},
-	{
-	    "s5k5e2_ofilm_ohw5f02",
-		s5k5e2_otp_func,
-		S5K5E2_OFILM_OHW5F02_RG_RATIO_TYPICAL,
-		S5K5E2_OFILM_OHW5F02_BG_RATIO_TYPICAL,
-		false,
-	},
-	{
-		"s5k5e2_foxconn_hc0806",
-		s5k5e2_otp_func,
-		S5K5E2_FOXCONN_HC0806_RG_RATIO_TYPICAL,
-		S5K5E2_FOXCONN_HC0806_BG_RATIO_TYPICAL,
-		false,
-	},
-	{
-		"ov5670_byd_cht854b",
-		ov5670_otp_func,
-		OV5670_BYD_CHT854B_RG_RATIO_TYPICAL,
-		OV5670_BYD_CHT854B_BG_RATIO_TYPICAL,
-		false,
-	},
-	{
-		"ov5670_ofilm_ohw5a03",
-		ov5670_otp_func,
-		OV5670_BYD_CHT854B_RG_RATIO_TYPICAL,
-		OV5670_BYD_CHT854B_BG_RATIO_TYPICAL,
-		false,
-	}
 };
 
 /*************************************************
@@ -198,9 +152,7 @@ struct otp_function_t otp_function_lists []=
 bool is_exist_otp_function( struct msm_sensor_ctrl_t *s_ctrl, int32_t *index)
 {
 	int32_t i = 0;
-	s_ctrl->afc_otp_info.starting_dac = 0;  
-	s_ctrl->afc_otp_info.infinity_dac = 0;
-	s_ctrl->afc_otp_info.macro_dac = 0;
+
 	for (i=0; i<(sizeof(otp_function_lists)/sizeof(otp_function_lists[0])); ++i)
 	{
 		if (0 == strncmp(s_ctrl->sensordata->sensor_name, otp_function_lists[i].sensor_name, strlen(s_ctrl->sensordata->sensor_name)))

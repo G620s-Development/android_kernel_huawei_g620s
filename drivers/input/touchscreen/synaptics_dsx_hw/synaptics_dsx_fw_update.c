@@ -515,8 +515,9 @@ static int fwu_read_f34_queries(void)
 	} else if (fwu->bootloader_id[1] == '6') {
 		fwu->bl_version = V6;
 	} else {
-		tp_log_err("%s %d: Unrecognized bootloader version, bl_id = %d\n",
-				__func__, __LINE__, fwu->bootloader_id[1]);
+		dev_err(&fwu->rmi4_data->i2c_client->dev,
+				"%s: Unrecognized bootloader version\n",
+				__func__);
 		return -EINVAL;
 	}
 
@@ -2041,7 +2042,7 @@ static int synaptics_rmi4_fwu_init(struct synaptics_rmi4_data *rmi4_data)
 {
 	int retval;
 	int ret = 0;
-	int attr_count;
+	unsigned char attr_count;
 	struct pdt_properties pdt_props;
 
 	tp_log_warning("%s(line %d): begin\n",__func__,__LINE__);
@@ -2095,8 +2096,8 @@ static int synaptics_rmi4_fwu_init(struct synaptics_rmi4_data *rmi4_data)
 				__func__);
 	} else if (pdt_props.has_bsr) {
 		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Reflash for LTS not currently supported,pdt_props.has_bsr=%d\n",
-				__func__,pdt_props.has_bsr);
+				"%s: Reflash for LTS not currently supported\n",
+				__func__);
 		retval = -ENODEV;
 		synp_tp_report_dsm_err( DSM_TP_PDT_PROPS_ERROR_NO, retval);
 		goto exit_free_mem;
@@ -2157,12 +2158,6 @@ static int synaptics_rmi4_fwu_init(struct synaptics_rmi4_data *rmi4_data)
 
 #ifdef DO_STARTUP_FW_UPDATE
 	fwu->fwu_workqueue = create_singlethread_workqueue("fwu_workqueue");
-	/*Solve the crash problem when fwu->fwu_workqueue is NULL*/
-	if(NULL == fwu->fwu_workqueue){
-		tp_log_err("%s: failed to create workqueue for fw upgrade\n", __func__);
-		retval = -ENOMEM;
-		goto exit_remove_attrs;
-	}
 	INIT_DELAYED_WORK(&fwu->fwu_work, fwu_startup_fw_update_work);
 	queue_delayed_work(fwu->fwu_workqueue,
 			&fwu->fwu_work,

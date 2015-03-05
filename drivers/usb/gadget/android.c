@@ -2586,8 +2586,6 @@ static ssize_t cdrom_index_store(struct device *pdev, struct device_attribute *a
 {
     char buf[32];
     int value = 0;
-    struct android_usb_function *f = dev_get_drvdata(pdev);
-    struct mass_storage_function_config *config = f->config;
     
     strlcpy(buf, buff, sizeof(buf));
 
@@ -2604,41 +2602,13 @@ static ssize_t cdrom_index_store(struct device *pdev, struct device_attribute *a
         return -1;
     }
 
-    if(likely(config) && likely(config->common) && likely(config->common->luns)
-        && value < USB_MAX_LUNS)
-    {
-        down_write(&config->common->filesem);
-        config->common->luns[value].cdrom = 1;
-        up_write(&config->common->filesem);
-    }
-
     cdrom_index = value;
     pr_info("%s: cdrom_index = %d\n", __func__, cdrom_index);
 	return size;    
 }
 
-/*
- * create /sys/class/android_usb/android0/f_mass_storage/suitestate
- * usb setttings apk will write 0 to this node
- */
-static ssize_t suitestate_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-    return snprintf(buf, PAGE_SIZE, "%d\n", suitestate);
-}
-static ssize_t suitestate_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
-{
-    int value = 0;
-    if(kstrtoint(buf, STRING_TO_DECIMAL_INT, &value) == 0)
-    {
-        suitestate = value;
-        return size;
-    }
-    return -1;
-}
-
 static DEVICE_ATTR(nluns, S_IRUGO | S_IWUSR, nluns_show, nluns_store);
 static DEVICE_ATTR(cdrom_index, S_IRUGO | S_IWUSR, cdrom_index_show, cdrom_index_store);
-static DEVICE_ATTR(suitestate, S_IRUGO | S_IWUSR, suitestate_show, suitestate_store);
 #endif
 
 
@@ -2670,7 +2640,6 @@ static struct device_attribute *mass_storage_function_attributes[] = {
     #ifdef CONFIG_HUAWEI_USB
 	&dev_attr_nluns,
 	&dev_attr_cdrom_index,
-	&dev_attr_suitestate,
 	#endif
 	NULL
 };

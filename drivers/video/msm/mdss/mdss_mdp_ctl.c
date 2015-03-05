@@ -2301,14 +2301,19 @@ static void mdss_mdp_mixer_setup(struct mdss_mdp_ctl *master_ctl,
 		case BLEND_OP_PREMULTIPLIED:
 			if (pipe->src_fmt->alpha_enable) {
 				blend_op = (MDSS_MDP_BLEND_FG_ALPHA_FG_CONST |
-					    MDSS_MDP_BLEND_BG_ALPHA_FG_PIXEL);
+					    MDSS_MDP_BLEND_BG_ALPHA_FG_PIXEL |
+					    MDSS_MDP_BLEND_BG_INV_ALPHA);
 				if (fg_alpha != 0xff) {
 					bg_alpha = fg_alpha;
-					blend_op |=
-						MDSS_MDP_BLEND_BG_MOD_ALPHA |
-						MDSS_MDP_BLEND_BG_INV_MOD_ALPHA;
-				} else {
-					blend_op |= MDSS_MDP_BLEND_BG_INV_ALPHA;
+					if(pipe->src_alpha_drop) {
+						blend_op &=~MDSS_MDP_BLEND_BG_ALPHA_FG_PIXEL;
+						blend_op |= MDSS_MDP_BLEND_BG_ALPHA_FG_CONST;
+					} else {
+						blend_op &=~MDSS_MDP_BLEND_BG_INV_ALPHA;
+						blend_op |=
+							MDSS_MDP_BLEND_BG_MOD_ALPHA |
+							MDSS_MDP_BLEND_BG_INV_MOD_ALPHA;
+					}
 				}
 			}
 			pr_debug("pnum=%d stg=%d op=PREMULTIPLIED\n", pipe->num,

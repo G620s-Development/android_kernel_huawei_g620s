@@ -133,8 +133,7 @@ static ssize_t pn547_dev_read(struct file *filp, char __user *buf,
 			ret = -EAGAIN;
 			goto fail;
 		}
-		//pr_info("Waiting for PN547 IRQ.\n");
-
+		pr_info("Waiting for PN547 IRQ.\n");
 		pn547_dev->do_reading = 0;
 		pn547_enable_irq(pn547_dev);
 		
@@ -142,7 +141,7 @@ static ssize_t pn547_dev_read(struct file *filp, char __user *buf,
 				pn547_dev->do_reading);
 
 		pn547_disable_irq(pn547_dev);
-		//pr_info("PN547 IRQ high.\n");
+		pr_info("PN547 IRQ high.\n");
 
 		if (pn547_dev->cancel_read) {
 			pn547_dev->cancel_read = false;
@@ -160,7 +159,7 @@ static ssize_t pn547_dev_read(struct file *filp, char __user *buf,
 	ret = i2c_master_recv(pn547_dev->client, tmp, count);
     mutex_unlock(&pn547_dev->read_mutex);
 
-	//pr_info("%s : i2c read %zu bytes. status : %d\n", __func__, count, ret);
+	pr_info("%s : i2c read %zu bytes. status : %d\n", __func__, count, ret);
 
 	if (ret < 0) {
 		pr_err("%s: PN547 i2c_master_recv returned %d\n", __func__, ret);
@@ -185,7 +184,6 @@ static ssize_t pn547_dev_read(struct file *filp, char __user *buf,
 
 fail:
 	mutex_unlock(&pn547_dev->read_mutex);
-       pr_err("%s : goto fail, and ret : %d \n", __func__,ret);
 
 	return ret;
 }
@@ -207,8 +205,7 @@ static ssize_t pn547_dev_write(struct file *filp, const char __user *buf,
 		return -EFAULT;
 	}
 
-	//pr_info("%s : writing %zu bytes.\n", __func__, count);
-
+	pr_info("%s : writing %zu bytes.\n", __func__, count);
 	/* Write data */
 	ret = i2c_master_send(pn547_dev->client, tmp, count);
 	if (ret != count) {
@@ -322,8 +319,7 @@ static int pn547_parse_dt(struct device *dev,
 		pr_err( "failed to get \"huawei,nfc_clk\"\n");
 		goto err;
 	}
-	//printk("huawei,clk-req-gpio=%d\n",pdata->clk_req_gpio);
-	pr_info("%s : huawei,clk-req-gpio=%d\n",__func__,pdata->clk_req_gpio);
+	printk("huawei,clk-req-gpio=%d\n",pdata->clk_req_gpio);
 err:
 	return ret;
 }
@@ -353,9 +349,8 @@ static int pn547_gpio_request(struct device *dev,
 {
 	int ret;
 //	int gpio_config=0;
-
-	//printk("pn547_gpio_request enter\n");
-	pr_info("%s : pn547_gpio_request enter\n", __func__);
+	
+	printk("pn547_gpio_request enter\n");
 
 	//NFC_INT
 	ret = gpio_request(pdata->irq_gpio, "nfc_int");
@@ -591,8 +586,7 @@ static struct i2c_driver pn547_driver = {
 
 static int __init pn547_dev_init(void)
 {
-       //printk("### %s begin! \n",__func__);
-       pr_info("### %s begin! \n",__func__);
+printk("### %s begin! \n",__func__);
 	return i2c_add_driver(&pn547_driver);
 }
 module_init(pn547_dev_init);

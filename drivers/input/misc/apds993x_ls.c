@@ -70,7 +70,7 @@ static int origin_prox = 822;
 #define APDS993X_ERROR_HAPPEN 1
 #define APDS993X_ERROR_NOTHAPPEN 0
 /*keep 400ms wakeup after the ps report the far or near state*/
-#define PS_WAKEUP_TIME 800
+#define PS_WAKEUP_TIME 400
 /*it is like min_proximity_value in 8x12 and 8930,to adjust the dynamic proximity ditance*/
 static int apds993x_ps_init_threshold = 960;
 /*remove to .h file*/
@@ -265,7 +265,7 @@ static int apds_dsm_report_i2c(struct apds993x_data *data)
 		APDS993X_ERR("%s: buffer is busy!", __func__);
 		return -EBUSY;
 	}
-
+	
 	size = dsm_client_record(apds993x_lps_dclient,
 				"i2c_scl_val=%d,i2c_sda_val=%d,vdd = %d, vdd_status = %d\n"
 				"vio=%d, vio_status=%d, excep_num=%d, i2c_err_num=%d\n"
@@ -273,7 +273,7 @@ static int apds_dsm_report_i2c(struct apds993x_data *data)
 				,excep->vio_mv,excep->vio_status,excep->excep_num,excep->i2c_err_num);
 
 	/*if device is not probe successfully or client is null, don't notify dsm work func*/
-	if(data->device_exist == false || apds993x_lps_dclient == NULL){
+	if(data->device_exist == false || apds993x_lps_dclient == NULL){		
 		return -ENODEV;
 	}
 
@@ -781,56 +781,25 @@ static void apds993x_dump_register(struct i2c_client *client,int status,int enab
 	APDS993X_INFO("%s,line %d:ptime = 0x%x,atime=0x%x,ppcount=0x%x\n",__func__,__LINE__,ptime,atime,ppcount);
 	APDS993X_INFO("%s,line %d:control = 0x%x,config=0x%x,pers=0x%x\n",__func__,__LINE__,control,config,pers);
 }
-static void apds993x_ps_report_event(struct i2c_client *client, int apds_status)
+static void apds993x_ps_report_event(struct i2c_client *client)
 {
-	int ch0data = 0;
-	int sunlight_detect = 0;
-	/*PS interrupt generation flags*/
-	int ps_int_occur = 0;
 	struct apds993x_data *data = i2c_get_clientdata(client);
 
 	int ret;
-	ch0data = apds993x_i2c_read(client, APDS993X_CH0DATAL_REG, APDS993X_I2C_WORD);
-	if(ch0data < 0)
-	{
-		APDS993X_ERR("%s,line %d:apds993x_i2c_read ch0data err:%d\n", __func__, __LINE__, ch0data);
-	}
-	else if(ch0data > APDS993X_SUNLIGHT_CHODATA)
-	{
-		sunlight_detect = 0x1;
-	}
+	ret = apds993x_i2c_read(client, APDS993X_PDATAL_REG,APDS993X_I2C_WORD);
 
-	APDS993X_INFO("%s, line %d: read status reg data: 0x%x; ch0data: %d, sunlight_detect:%d\n",
-		__func__, __LINE__, apds_status, ch0data, sunlight_detect);	
-
-	if((apds_status >= 0) && ((apds_status & (APDS993X_PINT)) == 0x20))
+	if( ret < 0 )
 	{
-		ret = apds993x_i2c_read(client, APDS993X_PDATAL_REG,APDS993X_I2C_WORD);
-		if( ret < 0 )
-		{
-		/* the number "200" is a value to make sure there is a valid value */
-			data->ps_data = 200 ;
-			APDS993X_ERR("%s, line %d: pdate<0, reset to %d\n", __func__, __LINE__, data->ps_data);
-		}else{
-			data->ps_data = ret ;
-			ps_int_occur = 1;
-			APDS993X_FLOW("%s, line %d:read ps data->ps_data:%d, ps_int_occur:%d\n",  
-				__func__, __LINE__, data->ps_data, ps_int_occur);
-		}
+	/* the number "200" is a value to make sure there is a valid value */
+		data->ps_data = 200 ;
+		APDS993X_ERR("%s, line %d: pdate<0, reset to %d\n", __func__, __LINE__, data->ps_data);
+	}else{
+		data->ps_data = ret ;
 	}
-	else
-	{
-			/* the number "200" is a value to make sure there is a valid value */
-			data->ps_data = 200 ;
-			APDS993X_FLOW("%s, line %d:ps intruppt not occur data->ps_data:%d\n",  __func__, __LINE__, data->ps_data);
-	}
-	APDS993X_FLOW("%s, line %d: read pdata reg data: %d\n",
-		__func__, __LINE__, data->ps_data);
 	/*remove to interrupt function to avoid phone suspend and pls work still running*/
 
-	APDS993X_FLOW("%s,line %d:apds9930 ps_data=%d,ps_min_threshold=%d, ps_int_occur:%d\n",__func__,__LINE__,
-		data->ps_data,data->ps_min_threshold, ps_int_occur);
-	if(((data->ps_data + apds993x_pwave_value) < (data->ps_min_threshold)) && ps_int_occur)
+	APDS993X_FLOW("%s,line %d:apds9930 ps_data=%d,ps_min_threshold=%d\n",__func__,__LINE__,data->ps_data,data->ps_min_threshold);
+	if ((data->ps_data + apds993x_pwave_value) < (data->ps_min_threshold))
 	{
 		data->ps_min_threshold = data->ps_data + apds993x_pwave_value;
 
@@ -852,13 +821,8 @@ static void apds993x_ps_report_event(struct i2c_client *client, int apds_status)
 			APDS993X_FLOW("%s,line %d:data->ps_data=%d data->pilt=%d data->piht=%d\n", __func__, __LINE__, data->ps_data, data->pilt, data->piht);
 		}
 	}
-	data->pilt = apds993x_i2c_read(client, APDS993X_PILTL_REG, APDS993X_I2C_WORD);
-	data->piht = apds993x_i2c_read(client, APDS993X_PIHTL_REG, APDS993X_I2C_WORD);
-	if (data->pilt < 0 || data->piht < 0){
-		APDS993X_ERR("%s,line %d:data->pilt = %d,data->piht=%d,read i2c wrong\n",__func__,__LINE__,data->pilt,data->piht);
-		goto exit;
-	}
-	if ((data->ps_data >= data->piht) && (!sunlight_detect) && ps_int_occur) {
+
+	if (data->ps_data >= data->piht) {
 		/* far-to-near detected */
 		data->ps_detection = APDS993X_CLOSE_FLAG;
 
@@ -882,7 +846,7 @@ static void apds993x_ps_report_event(struct i2c_client *client, int apds_status)
 			cur_pthreshold_l = data->pilt;
 			APDS993X_FLOW("%s,line %d:data->ps_data=%d data->pilt=%d data->piht=%d\n", __func__, __LINE__, data->ps_data, data->pilt, data->piht);
 		}
-	} else if (((data->ps_data <= data->pilt)) ||(sunlight_detect)) {
+	} else if ((data->ps_data <= data->pilt)) {
 		/* near-to-far detected */
 		data->ps_detection = APDS993X_FAR_FLAG;
 
@@ -908,12 +872,6 @@ static void apds993x_ps_report_event(struct i2c_client *client, int apds_status)
 			cur_pthreshold_l = data->pilt;
 			APDS993X_FLOW("%s:data->ps_data=%d data->pilt=%d data->piht=%d\n", __func__, data->ps_data, data->pilt, data->piht);
 		}
-		if(1 == sunlight_detect)
-		{
-			ret = apds993x_i2c_write(client,APDS993X_ENABLE_REG, data->enable,APDS993X_I2C_BYTE);
-			/*To avoid Always generated light interrupt*/
-			msleep(300);
-		}
 	}
 	else{
 		APDS993X_ERR("%s,line %d:data->ps_data=%d,data->pilt = %d,data->piht=%d,wrong interrupts\n",__func__,__LINE__,data->ps_data, data->pilt,data->piht);
@@ -927,12 +885,6 @@ exit:
 		input_sync(data->input_dev_ps);
 		data->ps_detection= APDS993X_FAR_FLAG;
 		APDS993X_ERR("%s:i2c error happens, report far event, data->ps_data:%d\n", __func__,data->ps_data);
-		if(1 == sunlight_detect)
-		{
-			ret = apds993x_i2c_write(client,APDS993X_ENABLE_REG, data->enable,APDS993X_I2C_BYTE);
-			/*To avoid Always generated light interrupt*/
-			msleep(300);
-		}
 		return ;
 	}
 }
@@ -1060,7 +1012,8 @@ static void apds993x_work_handler(struct work_struct *work)
 		mutex_unlock(&data->single_lock);
 		return ;
 	}
-	if (((status & enable & 0x20) == 0x20) || ((status & enable & 0x10) == 0x10)) {
+
+	if ((status & enable & 0x20) == 0x20) {
 		/* only PS is interrupted */
 		APDS993X_FLOW("%s,line %d:only PLS is detected.\n",__func__,__LINE__);
 		/* check if this is triggered by background ambient noise */
@@ -1070,12 +1023,12 @@ static void apds993x_work_handler(struct work_struct *work)
 		/*if strong sunlight trigger PS close event,ps_saturation_flag =1 not 0*/
 		if (ps_saturation_flag == APDS993X_SATURATION_NOT_OVER)
 		{
-			apds993x_ps_report_event(client, status);
+			apds993x_ps_report_event(client);
 		}
 		else
 		{
 			if (data->ps_detection == APDS993X_CLOSE_FLAG)
-				apds993x_ps_report_event(client, status);
+				apds993x_ps_report_event(client);
 			else
 				APDS993X_INFO("%s: background ambient noise\n",__func__);
 		}
@@ -1083,8 +1036,8 @@ static void apds993x_work_handler(struct work_struct *work)
 		APDS993X_ERR("%s,line %d:wrong interrupts,APDS993X_STATUS_REG is 0X%x\n",__func__,__LINE__,status);
 	}
 
-	/* 2 = CMD_CLR_PS_ALS_INT */
-	apds993x_set_command(client, 2);
+	/* 0 = CMD_CLR_PS_INT */
+	apds993x_set_command(client, 0);
 	ret = apds993x_i2c_write(client,APDS993X_ENABLE_REG, data->enable,APDS993X_I2C_BYTE);
 	mutex_unlock(&data->single_lock);
 	if (ret < 0)
@@ -1189,9 +1142,8 @@ static int apds993x_enable_als_sensor(struct i2c_client *client, int val)
 			data->enable_als_sensor = 0;
 			if(data->enable_ps_sensor ==1)
 			{
-				/*don't disable als sensor,ps sensor need it to check Ambient light Infra-red noise*/
-				APDS993X_INFO("%s: line:%d,don't disable als sensor,ps sensor need it to check Ambient light Infra-red noise\n", 
-						__func__, __LINE__);
+				data->enable = (data->enable)&0xfd;
+				apds993x_set_enable(client, data->enable);
 			}
 			else
 			{
@@ -1219,7 +1171,7 @@ static int apds993x_open_ps_sensor(struct apds993x_data *data, struct i2c_client
 	int ret = 0;
 	/* turn on p sensor */
 	if (data->enable_ps_sensor==0) {
-		//if(data->enable_als_sensor == 0){
+		if(data->enable_als_sensor == 0){
 			/* Power on and initalize the device */
 			if (data->platform_data->power_on)
 				data->platform_data->power_on(true,data);
@@ -1229,7 +1181,7 @@ static int apds993x_open_ps_sensor(struct apds993x_data *data, struct i2c_client
 				APDS993X_ERR("%s:line:%d,Failed to init apds993x\n", __func__, __LINE__);
 				return ret;
 			}
-		//}
+		}
 
 		data->enable_ps_sensor= 1;
 		/*initialize the ps_min_threshold,to update data->piht and data->pilt*/
@@ -1237,16 +1189,12 @@ static int apds993x_open_ps_sensor(struct apds993x_data *data, struct i2c_client
 		APDS993X_FLOW("%s,line %d:change threshoid,data->ps_min_threshold =%d\n",__func__,__LINE__,data->ps_min_threshold);
 		ret = apds993x_i2c_write(client,APDS993X_PILTL_REG,far_init,APDS993X_I2C_WORD);
 		ret += apds993x_i2c_write(client,APDS993X_PIHTL_REG,near_init,APDS993X_I2C_WORD);
-		/*we use ch0data high thresh hold to check sunlight*/
-		ret += apds993x_i2c_write(client,APDS993X_AILTL_REG, 0, APDS993X_I2C_WORD);
-		ret += apds993x_i2c_write(client,APDS993X_AIHTL_REG, APDS993X_SUNLIGHT_CHODATA, APDS993X_I2C_WORD);
 		if (ret < 0)
 			return ret;
 		APDS993X_INFO("%s,line %d:change threshoid,data->ps_data =%d,data->pilt=%d,data->piht=%d,\n", __func__,__LINE__,data->ps_data, data->pilt, data->piht);
 
 		/*we use our own calibration algorithm,more details of the algorithm you can check apds993x_ps_report_event*/
-		/*clear als_ps interrupt before enable AP irq*/
-		apds993x_set_command(client, 2);
+
 		if (data->irq)
 		{
 			operate_irq(data,1,true);
@@ -1254,8 +1202,7 @@ static int apds993x_open_ps_sensor(struct apds993x_data *data, struct i2c_client
 			irq_set_irq_wake(data->irq, 1);
 		}
 
-		/* Infrared detection results under the impact of ambient light , so need open ambient light and enable irq*/
-		data->enable = ((data->enable) |0x25 |0x3 | APDS993X_SUNLIGHT_AIEN);
+		data->enable = (data->enable) |0x25;
 		apds993x_set_enable(client, data->enable);
 		APDS993X_INFO("%s: line:%d,enable pls sensor.data->enable = 0x%x\n", __func__, __LINE__,data->enable);
 		/* 0 is close, 1 is far */
@@ -1819,8 +1766,8 @@ static int apds993x_resume(struct i2c_client *client)
 	APDS993X_INFO("%s,line%d:APDS993X RESUME\n",__func__,__LINE__);
 	if(APDS993X_ERROR_HAPPEN == apds993x_error_flag)
 	{
-		/* 2 = CMD_CLR_PS_INT */
-		apds993x_set_command(client, 2);
+		/* 0 = CMD_CLR_PS_INT */
+		apds993x_set_command(client, 0);
 		if (data->irq)
 		{
 			operate_irq(data,1,true);
@@ -1971,8 +1918,7 @@ static int apds993x_irq_init(struct apds993x_data *data,struct i2c_client *clien
 	data->irq = client->irq;
 	if (client->irq)
 	{
-		/*AP examination of low level to prevent lost interrupt*/
-		if (request_irq(data->irq, apds993x_interrupt,IRQF_TRIGGER_LOW|IRQF_ONESHOT|IRQF_NO_SUSPEND, APDS993X_DRV_NAME, (void *)client) >= 0)
+		if (request_irq(data->irq, apds993x_interrupt,IRQF_TRIGGER_FALLING|IRQF_ONESHOT|IRQF_NO_SUSPEND, APDS993X_DRV_NAME, (void *)client) >= 0)
 		{
 			APDS993X_FLOW("%s, line %d:Received IRQ!\n", __func__, __LINE__);
 			operate_irq(data,0,true);
@@ -2501,7 +2447,5 @@ MODULE_VERSION(DRIVER_VERSION);
 
 module_init(apds993x_init);
 module_exit(apds993x_exit);
-
-
 
 

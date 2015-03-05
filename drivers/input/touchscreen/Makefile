@@ -86,4 +86,3 @@ obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)		+= synaptics_i2c_rmi4.o
 obj-$(CONFIG_TOUCHSCREEN_GT9XX)		+= gt9xx/
 obj-$(CONFIG_TOUCHSCREEN_HUAWEI_FOCALTECH_FT6X06) += focaltech/
 obj-$(CONFIG_TOUCHSCREEN_HUAWEI_MSTAR_MSG21XX) += mstar/
-obj-y += getevent_common_report.o

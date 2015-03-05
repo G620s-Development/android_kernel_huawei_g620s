@@ -176,9 +176,9 @@ static u32 s1_delay[PON_S1_COUNT_MAX + 1] = {
 	3072, 4480, 6720, 10256
 };
 
-#ifdef CONFIG_HUAWEI_KERNEL
-u32 pon_regs[MAX_REG_TYPE] = {0};
-#endif
+//store pon reason, poff reason, warm reset reason with following format:
+//<pon reason>    <poff reason>    <warm reset reason>
+char poweronoff_reason[POWERONOFF_REASON_MAXLEN] = {0};
 
 static const char * const qpnp_pon_reason[] = {
 	[0] = "Triggered from Hard Reset",
@@ -191,6 +191,18 @@ static const char * const qpnp_pon_reason[] = {
 	[7] = "Triggered from KPD (power key press)",
 };
 
+//8916 platform pmic pon reason register define.
+//according "80-NK808-2X PM8916 SOFTWARE INTERFACE FOR OEMS.pdf"
+static const char * const qpnp_pon_reason_shorten[] = {
+	[0] = "BIT0_HARD_RESET",
+	[1] = "BIT1_SMPL",
+	[2] = "BIT2_RTC",
+	[3] = "BIT3_DC_CHG",
+	[4] = "BIT4_USB_CHG",
+	[5] = "BIT5_PON1",
+	[6] = "BIT6_CBLPWR_N",
+	[7] = "BIT7_KPDPWR_N",
+};
 
 static const char * const qpnp_poff_reason[] = {
 	[0] = "Triggered from SOFT (Software)",
@@ -213,7 +225,27 @@ static const char * const qpnp_poff_reason[] = {
 	[15] = "Triggered from STAGE3 (Stage 3 reset)",
 };
 
-
+//8916 platform pmic poff reason register define.
+//according "80-NK808-2X PM8916 SOFTWARE INTERFACE FOR OEMS.pdf"
+static const char * const qpnp_poff_reason_shorten[] = {
+	[0] = "BIT0_SOFT",
+	[1] = "BIT1_PS_HOLD",
+	[2] = "BIT2_PMIC_WD",
+	[3] = "BIT3_GP1",
+	[4] = "BIT4_GP2",
+	[5] = "BIT5_KPDPWR_AND_RESIN",
+	[6] = "BIT6_RESIN_N",
+	[7] = "BIT7_KPDPWR_N",
+	
+	[8] = "BIT8_UNDEF",
+	[9] = "BIT9_UNDEF",
+	[10] = "BIT10_AVDD_RB",
+	[11] = "BIT11_CHARGER",
+	[12] = "BIT12_TFT",
+	[13] = "BIT13_UVLO",
+	[14] = "BIT14_OTST3",
+	[15] = "BIT15_STAGE3",
+};
 /*
  * On the kernel command line specify
  * qpnp-power-on.warm_boot=1 to indicate a warm
@@ -1455,6 +1487,27 @@ static const char * const qpnp_pon_warm_reset_reason[] = {
 	[15] = "Unknow",
 };
 
+//8916 platform pmic poff reason register define.
+//according "80-NK808-2X PM8916 SOFTWARE INTERFACE FOR OEMS.pdf"
+static const char * const qpnp_pon_warm_reset_reason_shorten[] = {
+	[0] = "BIT0_SOFT",
+	[1] = "BIT1_PS_HOLD",
+	[2] = "BIT2_PMIC_WD",
+	[3] = "BIT3_GP1",
+	[4] = "BIT4_GP2",
+	[5] = "BIT5_KPDPWR_AND_RESIN",
+	[6] = "BIT6_RESIN_N",
+	[7] = "BIT7_KPDPWR_N",
+	
+	[8] = "BIT8_UNDEF",
+	[9] = "BIT9_UNDEF",
+	[10] = "BIT10_UNDEF",
+	[11] = "BIT11_UNDEF",
+	[12] = "BIT12_AFP",
+	[13] = "BIT13_UNDEF",
+	[14] = "BIT14_UNDEF",
+	[15] = "BIT15_UNDEF",
+};
 
 static void hw_dump_warm_reset_reason(void)
 {
@@ -1473,19 +1526,27 @@ static void hw_dump_warm_reset_reason(void)
 		return;
 	}
 
-	pon_regs[WARM_REASON_INDEX] = pon_warm_reset_reason;
-
 	index = ffs(pon_warm_reset_reason) - 1;
 	if ((index >= REASON_MAX) || (index < 0))
 	{
+               //fill poff reason into global var 'poweronoff_reason'
                dev_info(&pon->spmi->dev,"PMIC@SID%d:Warm-reset reason: %s and reg: 0x%x \n",
         		 pon->spmi->sid, "cold boot", pon_warm_reset_reason);
+        	
+               snprintf((char *)(poweronoff_reason+strlen(poweronoff_reason)),  
+                    sizeof(poweronoff_reason)-strlen(poweronoff_reason), 
+                    "<warmreset 0x%x  cold boot >    ", pon_warm_reset_reason);
 	}
 	else
 	{
         	dev_info(&pon->spmi->dev,"PMIC@SID%d:Warm-reset reason: %s and reg: 0x%x \n",
         		 pon->spmi->sid, qpnp_pon_warm_reset_reason[index], pon_warm_reset_reason);
-	}
+
+               //fill poff reason into global var 'poweronoff_reason'
+               snprintf((char *)(poweronoff_reason+strlen(poweronoff_reason)),  
+                    sizeof(poweronoff_reason)-strlen(poweronoff_reason), 
+                    "<warmreset 0x%x  %s >    ", pon_warm_reset_reason, qpnp_pon_warm_reset_reason_shorten[index]);
+       }
 
 	return;
 }
@@ -1570,14 +1631,16 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 			cold_boot ? "cold" : "warm");
 
 #else
-            pon_regs[PON_REASON_INDEX] = pon_sts;
-
             if (index >= ARRAY_SIZE(qpnp_pon_reason) || index < 0)
             {
                 dev_info(&pon->spmi->dev, 
                         "PMIC@SID%d Power-on reason: Unknown and '%s' boot, reg:0x%x\n",
                         pon->spmi->sid, cold_boot ? "cold" : "warm", pon_sts);
                         
+                //fill pon reason into global var 'poweronoff_reason'
+                snprintf((char *)(poweronoff_reason+strlen(poweronoff_reason)),  
+                               sizeof(poweronoff_reason)-strlen(poweronoff_reason), 
+                               "<pon 0x%x  unknown>    ", pon_sts);
             }
             else
             {
@@ -1586,6 +1649,10 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
                         pon->spmi->sid, qpnp_pon_reason[index],
                         cold_boot ? "cold" : "warm", pon_sts);
                         
+                //fill pon reason into global var 'poweronoff_reason'
+                snprintf((char *)(poweronoff_reason+strlen(poweronoff_reason)),  
+                               sizeof(poweronoff_reason)-strlen(poweronoff_reason), 
+                               "<pon 0x%x  %s>    ", pon_sts, qpnp_pon_reason_shorten[index]);
             }
 #endif
 
@@ -1613,13 +1680,16 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 				pon->spmi->sid,
 				qpnp_poff_reason[index]);
 #else
-        pon_regs[POFF_REASON_INDEX] = poff_sts;
-
         if (index >= ARRAY_SIZE(qpnp_poff_reason) || index < 0)
         {
             dev_info(&pon->spmi->dev,
             		"PMIC@SID%d: Unknown power-off reason, reg:0x%x\n",
             		pon->spmi->sid, poff_sts);
+
+            //fill poff reason into global var 'poweronoff_reason'
+            snprintf((char *)(poweronoff_reason+strlen(poweronoff_reason)),  
+               sizeof(poweronoff_reason)-strlen(poweronoff_reason), 
+               "<poff 0x%x  unknown>    ", poff_sts);
         }
         else
         {
@@ -1627,6 +1697,11 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
             		"PMIC@SID%d: Power-off reason: %s, reg:0x%x\n",
             		pon->spmi->sid,
             		qpnp_poff_reason[index], poff_sts);
+
+            //fill poff reason into global var 'poweronoff_reason'
+            snprintf((char *)(poweronoff_reason+strlen(poweronoff_reason)),  
+               sizeof(poweronoff_reason)-strlen(poweronoff_reason), 
+               "<poff 0x%x  %s>    ", poff_sts, qpnp_poff_reason_shorten[index]);
         }
 #endif
 

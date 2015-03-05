@@ -16,7 +16,7 @@ qcom,qrd-4v35-3000mAh-swd-data {
 	qcom,rbatt-capacitive-mohm = <50>;
 	qcom,flat-ocv-threshold-uv = <3800000>;
 	qcom,max-voltage-uv = <4350000>;
-	qcom,v-cutoff-uv = <3300000>;
+	qcom,v-cutoff-uv = <3400000>;
 	qcom,chg-term-ua = <100000>;
 	qcom,batt-id-kohm = <470>;
 	qcom,battery-type = "HB4242B4EBW_LG_SWD";
@@ -122,9 +122,9 @@ qcom,qrd-4v35-3000mAh-swd-data {
 	qcom,ibat-acc-lut {
                 qcom,lut-col-legend = <(-20) 0 25>;
                 qcom,lut-row-legend = <0 250 500 1000>;
-                qcom,lut-data = <2966 2964 2962>,
-				<1056 2790 2918>,
-				<96 2531 2892>,
-				<6 1794 2817>;
+                qcom,lut-data = <2936 2934 2932>,
+				<712 2638 2891>,
+				<11 2214 2858>,
+				<6 1386 2730>;
 };
 };

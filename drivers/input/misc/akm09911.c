@@ -80,7 +80,6 @@ struct akm_compass_data {
 	struct delayed_work	dwork;
 	struct workqueue_struct	*work_queue;
 	struct mutex		op_mutex;
-	struct mutex		self_test_mutex;
 
 	wait_queue_head_t	drdy_wq;
 	wait_queue_head_t	open_wq;
@@ -1195,9 +1194,7 @@ static int akm_enable_set(struct sensors_classdev *sensors_cdev,
 		}
 
 		if (akm->auto_report) {
-			mutex_lock(&akm->self_test_mutex);
 			AKECS_SetMode(akm, AKM_MODE_SNG_MEASURE);
-			mutex_unlock(&akm->self_test_mutex);
 			schedule_delayed_work(&akm->dwork,
 				(unsigned long)nsecs_to_jiffies64(
 					akm->delay[MAG_DATA_FLAG]));
@@ -1206,9 +1203,7 @@ static int akm_enable_set(struct sensors_classdev *sensors_cdev,
 	} else {
 		if (akm->auto_report) {
 			cancel_delayed_work_sync(&akm->dwork);
-			mutex_lock(&akm->self_test_mutex);
 			AKECS_SetMode(akm, AKM_MODE_POWERDOWN);
-			mutex_unlock(&akm->self_test_mutex);
 		}
 		ret = akm_compass_power_set(akm, false);
 		if (ret) {
@@ -2301,7 +2296,6 @@ static void akm_dev_poll(struct work_struct *work)
 
 	akm = container_of((struct delayed_work *)work,
 			struct akm_compass_data,  dwork);
-	mutex_lock(&akm->self_test_mutex);
 
 	ret = akm_report_data(akm);
 	if (ret < 0)
@@ -2312,7 +2306,6 @@ static void akm_dev_poll(struct work_struct *work)
 		dev_warn(&s_akm->i2c->dev, "Failed to set mode\n");
 	queue_delayed_work(akm->work_queue, &akm->dwork,
 			(unsigned long)nsecs_to_jiffies64(akm->delay[MAG_DATA_FLAG]));
-	mutex_unlock(&akm->self_test_mutex);
 }
 int
 TEST_DATA(const char testno[],
@@ -2377,8 +2370,6 @@ static int akm_self_test(struct sensors_classdev *sensors_cdev)
 	int count;
 	int ret;
 
-	mutex_lock(&akm->self_test_mutex);
-
 	/* Removed lines. */
 	asax = akm->sense_conf[0];
 	asay = akm->sense_conf[1];
@@ -2399,14 +2390,12 @@ static int akm_self_test(struct sensors_classdev *sensors_cdev)
 	ret = akm_compass_power_set(akm, true);
 	if (ret) {
 		pr_err("Sensor power resume fail!\n");
-		mutex_unlock(&akm->self_test_mutex);
 		return false;
 	}
 
 	// Reset device.
 	if (AKECS_Reset(akm, 0) < 0) {
 		dev_err(&akm->i2c->dev, "Reset failed.\n");
-		mutex_unlock(&akm->self_test_mutex);
 		return false;
 	}
 
@@ -2418,7 +2407,6 @@ static int akm_self_test(struct sensors_classdev *sensors_cdev)
 	// Set to PowerDown mode
 	if (AKECS_SetMode(akm, AK09911_MODE_POWERDOWN) < 0) {
 		pr_info("%s:%d Error.\n", __FUNCTION__, __LINE__);
-		mutex_unlock(&akm->self_test_mutex);
 		return false;
 	}
 
@@ -2429,7 +2417,6 @@ static int akm_self_test(struct sensors_classdev *sensors_cdev)
 	// Set to SNG measurement pattern (Set CNTL register)
 	if (AKECS_SetMode(akm, AK09911_MODE_SNG_MEASURE) < 0) {
 		pr_info("%s:%d Error.\n", __FUNCTION__, __LINE__);
-		mutex_unlock(&akm->self_test_mutex);
 		return false;
 	}
 
@@ -2450,8 +2437,7 @@ static int akm_self_test(struct sensors_classdev *sensors_cdev)
 	} while ((ret == -EAGAIN) && (--count));
 
 	if (!count) {
-		pr_err("%s:%d :Timeout get valid data.\n",__FUNCTION__,__LINE__);
-		mutex_unlock(&akm->self_test_mutex);
+		pr_err("Timeout get valid data.\n");
 		return false;
 	}
 
@@ -2476,7 +2462,6 @@ static int akm_self_test(struct sensors_classdev *sensors_cdev)
 	// Set to Self-test mode (Set CNTL register)
 	if (AKECS_SetMode(akm, AK09911_MODE_SELF_TEST) < 0) {
 		pr_info("%s:%d Error.\n", __FUNCTION__, __LINE__);
-		mutex_unlock(&akm->self_test_mutex);
 		return false;
 	}
 
@@ -2497,8 +2482,7 @@ static int akm_self_test(struct sensors_classdev *sensors_cdev)
 	} while ((ret == -EAGAIN) && (--count));
 
 	if (!count) {
-		pr_err("%s:%d :Timeout get valid data.\n",__FUNCTION__,__LINE__);
-		mutex_unlock(&akm->self_test_mutex);
+		pr_err("Timeout get valid data.\n");
 		return false;
 	}
 
@@ -2557,7 +2541,6 @@ static int akm_self_test(struct sensors_classdev *sensors_cdev)
 	if (ret)
 		pr_err("Can't select pinctrl state\n");
 	/* Removed lines. */
-	mutex_unlock(&akm->self_test_mutex);
 	return (pf_total > 0) ? true : false;
 }
 
@@ -2593,7 +2576,6 @@ int akm_compass_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	mutex_init(&s_akm->accel_mutex);
 	mutex_init(&s_akm->val_mutex);
 	mutex_init(&s_akm->op_mutex);
-	mutex_init(&s_akm->self_test_mutex);
 
 	atomic_set(&s_akm->active, 0);
 	atomic_set(&s_akm->drdy, 0);

@@ -735,6 +735,7 @@ int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 
 	pipe->mixer_stage = req->z_order;
 	pipe->is_fg = req->is_fg;
+	pipe->src_alpha_drop = req->src_alpha_drop;
 	pipe->alpha = req->alpha;
 	pipe->transp = req->transp_mask;
 	pipe->blend_op = req->blend_op;

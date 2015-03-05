@@ -1499,7 +1499,7 @@ static void set_report_size(void)
 	rx = f54->rx_assigned;
 	tx = f54->tx_assigned;
 
-	tp_log_info("%s: reportType=%d, f54->rx_assigned=%d,f54->tx_assigned=%d\n", __func__, f54->report_type,f54->rx_assigned,f54->tx_assigned);
+	tp_log_info("%s: reportType=%d \n", __func__, f54->report_type);
 	switch (f54->report_type) {
 	case F54_8BIT_IMAGE:
 		f54->report_size = rx * tx;
@@ -1568,7 +1568,6 @@ static void set_report_size(void)
 	default:
 		f54->report_size = 0;
 	}
-	tp_log_info("%s: f54->report_size=%d \n", __func__, f54->report_size);
 
 	return;
 }
@@ -2892,11 +2891,6 @@ test_exit:
 static ssize_t synaptics_rmi4_f54_mmi_test_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	/*always return true in order to suit the struction of mmi test */
-	return count;
-}
-static int synaptics_rmi4_f54_mmi_test(void)
-{
 	int retval = 0;
 	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
 	tp_log_debug("%s#%d\n",__func__, __LINE__);
@@ -2908,7 +2902,6 @@ static int synaptics_rmi4_f54_mmi_test(void)
 		g_mmi_buf_f54test_result = kmalloc(F54_MAX_CAP_RESULT_SIZE, GFP_KERNEL);
 		if (!g_mmi_buf_f54test_result) {
 			tp_log_err("%s#%d g_mmi_buf_f54test_result kmalloc failed.\n",__func__,__LINE__);
-			retval = -ENOMEM;
 			goto exit;
 		}
 	}
@@ -2961,7 +2954,7 @@ static int synaptics_rmi4_f54_mmi_test(void)
 	if (rmi4_data->board->esd_support) {
 		synaptics_dsx_esd_resume();
 	}
-	return 0;
+	return count;
 
 exit:
 	/* if one test item failed, we also should rest device */
@@ -2975,23 +2968,13 @@ exit:
 	if (rmi4_data->board->esd_support) {
 		synaptics_dsx_esd_resume();
 	}
-	return retval;
+	return count;	
 }
+
 static ssize_t synaptics_rmi4_f54_mmi_test_result_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	int len = 0;
-	int retval = 0;
-
-	retval = synaptics_rmi4_f54_mmi_test();
-	if(retval)
-	{
-		tp_log_err("%s:synaptics_rmi4_f54_mmi_test faild",__func__);
-	}
-	else
-	{
-		tp_log_info("%s:synaptics_rmi4_f54_mmi_test success",__func__);
-	}
 	tp_log_warning("%s begin \n", __func__);
 	if(NULL != g_mmi_buf_f54test_result)
 	{
@@ -3928,7 +3911,7 @@ static u32 get_of_u32_val(struct device_node *np,
 	}
 }
 /*To get the tp module id by the product id */
-int get_product_module_name(unsigned char *product_id)
+static int get_product_module_name(unsigned char *product_id)
 {
 	int product_module_name = UNKNOW_PRODUCT_MODULE;
 	int len = strlen(product_id);
@@ -4155,7 +4138,7 @@ void get_f54_get_cap_limit(struct device *dev,char *product_id,u16 ic_type)
 	f54->f54_full_raw_max_cap =
 		create_and_get_u16_array(dev_node,"huawei,fullraw_upperlimit", &size);
 	if (!f54->f54_full_raw_max_cap || size != rx * tx) {
-		tp_log_err("unable to read huawei,fullraw_upperlimit size=%d,rx*tx=%d\n", size, rx * tx);
+		tp_log_err("unable to read huawei,fullraw_upperlimit size=%d\n", size);
 		goto error;
 	}
 
@@ -4163,7 +4146,7 @@ void get_f54_get_cap_limit(struct device *dev,char *product_id,u16 ic_type)
 	f54->f54_full_raw_min_cap =
 		create_and_get_u16_array(dev_node,"huawei,fullraw_lowerlimit", &size);
 	if (!f54->f54_full_raw_min_cap || size != rx*tx) {
-		tp_log_err("unable to read huawei,fullraw_lowerlimit size=%d,rx*tx=%d\n", size, rx * tx);
+		tp_log_err("unable to read huawei,fullraw_lowerlimit size=%d\n", size);
 		goto error;
 	}
 
@@ -4436,7 +4419,6 @@ static void synaptics_rmi5_f55_init(struct synaptics_rmi4_data *rmi4_data)
 		if (f55->tx_assignment[ii] != 0xff)
 			f54->tx_assigned++;
 	}
-	tp_log_info("%s: line(%d) f54->rx_assigned =%d.f54->tx_assigned=%d\n",__func__,__LINE__,f54->rx_assigned,f54->tx_assigned);
 
 	return;
 }
@@ -4621,7 +4603,6 @@ pdt_done:
 				__func__);
 		goto exit_free_mem;
 	}
-	tp_log_info("%s: line(%d) num_of_rx_electrodes=%d.num_of_tx_electrodes=%d\n",__func__,__LINE__,f54->query.num_of_rx_electrodes, f54->query.num_of_tx_electrodes);
 
 	f54->rx_assigned = f54->query.num_of_rx_electrodes;
 	f54->tx_assigned = f54->query.num_of_tx_electrodes;
@@ -4656,11 +4637,6 @@ pdt_done:
 #endif
 	f54->status_workqueue =
 			create_singlethread_workqueue("f54_status_workqueue");
-	if(NULL == f54->status_workqueue){
-		tp_log_err("%s: failed to create workqueue for f54 status\n", __func__);
-		retval = -ENOMEM;
-		goto exit_sysfs;
-	}
 	INIT_DELAYED_WORK(&f54->status_work,
 			synaptics_rmi4_f54_status_work);
 

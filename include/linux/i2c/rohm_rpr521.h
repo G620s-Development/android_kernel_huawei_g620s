@@ -173,7 +173,7 @@ struct rpr521_platform_data {
 #define PS_ALS_SET_MODE_CONTROL   (BOTH100MS)//(NORMAL_MODE)
 #define PS_DOUBLE_PULSE       (1 << 5)
 #define PS_ALS_SET_ALSPS_CONTROL  (LEDCURRENT_100MA | ALSGAIN_X2X2)	//Set high gain value to acquire high accuracy
-#define PS_ALS_SET_INTR_PERSIST   (PSGAIN_X2 | 0x1)
+#define PS_ALS_SET_INTR_PERSIST   (PSGAIN_X1 | 0x1)
 #define PS_ALS_SET_INTR           (PS_THH_BOTH_OUTSIDE| POLA_ACTIVEL | OUTPUT_LATCH | MODE_PROXIMITY)
 //#define PS_ALS_SET_INTR           (PS_THH_BOTH_OUTSIDE| POLA_ACTIVEL | OUTPUT_LATCH | MODE_NONUSE) //grace modify
 #define PS_ALS_SET_PS_TH          (30)	//Customer should change the threshold value according to their mechanical design and measured data

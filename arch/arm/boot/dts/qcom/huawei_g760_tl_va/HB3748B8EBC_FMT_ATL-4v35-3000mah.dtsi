@@ -1,3 +1,4 @@
+
 qcom,qrd-4v35-3000mAh-fmt-atl-data {
 	qcom,batt-id-kohm = <10>;
 	qcom,battery-type = "HB3748B8EBC_FMT_ATL";
@@ -14,7 +15,7 @@ qcom,qrd-4v35-3000mAh-fmt-atl-data {
 	qcom,ibatmax-warm-ma = <1050>;
 
 	qcom,cool-bat-decidegc = <100>;
-	qcom,cool-bat-mv = <4320>;
+	qcom,cool-bat-mv = <4350>;
 	qcom,ibatmax-cool-ma = <900>;
 
 	qcom,hot-bat-decidegc = <520>;

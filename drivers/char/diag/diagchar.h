@@ -322,17 +322,6 @@ struct diag_smd_info {
 	struct diag_request *write_ptr_1;
 	struct diag_request *write_ptr_2;
 
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-	unsigned char *usb_buf_in_1;
-	unsigned char *usb_buf_in_2;
-
-	unsigned int usb_buf_in_1_size;
-	unsigned int usb_buf_in_2_size;
-
-	struct diag_request *usb_write_ptr_1;
-	struct diag_request *usb_write_ptr_2;
-#endif
-
 	struct workqueue_struct *wq;
 
 	struct work_struct diag_read_smd_work;

@@ -11,10 +11,8 @@
 
 &pm8916_bms {
         status = "ok";
-        qcom,low-voltage-threshold = <3250000>;
+        qcom,low-voltage-threshold = <3350000>;
         qcom,battery-data = <&qrd_batterydata>;
-	qcom,cfg_hw_cut_off_voltage_uv = <3250000>;
-	qcom,cfg_hw_protect_voltage_uv = <3250000>;
 };
 
 &pm8916_chg {

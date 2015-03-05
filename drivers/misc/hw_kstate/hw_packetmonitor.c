@@ -108,7 +108,7 @@ typedef struct {
 } TIME_LIST_NODE;
 
 typedef struct {
-	kuid_t uid;
+	u32 uid;
 	u32 data_len;
 } UID_MATCH_INFO;
 
@@ -176,7 +176,7 @@ static inline void free_ptr(void *p)
  * Function: is_time_valid
  * Description: check the trigger time valid or not,
  *				by compare it to the day time
- * Input:	@trgr_time - trigger time to compare
+ * Input:	@time - trigger time to compare
  *			@day_time - time of day
  * Output:
  * Return:	false -- invalid
@@ -196,7 +196,7 @@ static bool is_time_valid(TRIGGER_TIME *trgr_time, struct timeval *day_time)
  * Return:	NULL -- non-existent
  *			corresponding UID_TREE_NODE struct pointer -- existent
 */
-static UID_TREE_NODE *search_uid(kuid_t uid)
+static UID_TREE_NODE *search_uid(u32 uid)
 {
 	struct rb_node *node = uid_tree_root.rb_node;
 	UID_TREE_NODE *ut_node = NULL;
@@ -218,7 +218,7 @@ static UID_TREE_NODE *search_uid(kuid_t uid)
  * Function: update_trigger_time
  * Description: update trigger time list by deleting the time that
  *				has passed day time from uid
- * Input:	@time_header - time list head pointer
+ * Input:	@header - time list head pointer
  *			@day_time - time of day
  * Output:
  * Return:	void
@@ -239,8 +239,8 @@ static void update_trigger_time(struct list_head *time_header, struct timeval *d
 /*
  * Function: is_time_existent
  * Description: check time list whether the trigger time exists
- * input:	@time_header - time list head pointer
- *			@trgr_time - trigger time to match
+ * input:	@header - time list head pointer
+ *			@time - trigger time to match
  * return:	false -- non-existent
  *			true -- existent
 */
@@ -259,8 +259,8 @@ static bool is_time_existent(struct list_head *time_header, TRIGGER_TIME *trgr_t
 /*
  * Function: add_trigger_time
  * Description: add trigger time to the time list
- * Input:	@time_header - time list head pointer
- *			@trgr_time - time to add
+ * Input:	@header - time list head pointer
+ *			@time - time to add
  * Output:
  * Return:	-1 -- failed
  *			0 -- successed
@@ -288,7 +288,7 @@ static int add_trigger_time(struct list_head *time_header, TRIGGER_TIME *trgr_ti
 /*
  * Function: add_uid_tree_node
  * Description: add a uid tree node
- * Input:	@uid_info - info that will be added to the node
+ * Input:	@info - info that will be added to the node
  * Output:
  * Return:	NULL -- failed
  *			corresponding UID_TREE_NODE struct pointer -- successed
@@ -336,7 +336,7 @@ static UID_TREE_NODE *add_uid_tree_node(UID_MATCH_INFO *uid_info)
  * Function: add_uid
  * Description: get add-uid command, if uid exists, directly add
  *				trigger time, or add uid tree node first
- * Input:	@mnt_cmd - source info
+ * Input:	@info - source info
  * Output:
  * Return:	-1 -- failed
  *			0 -- successed
@@ -347,7 +347,7 @@ static int add_uid(MONITOR_CMD *mnt_cmd)
 	struct timeval tv;
 	int ret = -1;
 
-	write_lock_bh(&uid_rwlock);
+	write_lock(&uid_rwlock);
 	ut_node = search_uid(mnt_cmd->uid_info.uid);
 	if (IS_ERR_OR_NULL(ut_node)) {
 		/*uid not exists*/
@@ -370,7 +370,7 @@ static int add_uid(MONITOR_CMD *mnt_cmd)
 	}
 	ret = 0;
 err:
-	write_unlock_bh(&uid_rwlock);
+	write_unlock(&uid_rwlock);
 	return ret;
 }
 
@@ -378,7 +378,7 @@ err:
  * Function: del_uid_tree_node
  * Description: delete a uid tree node from uid tree,
  *				including the corresponding time list
- * Input:	@ut_node - uid tree node to delete
+ * Input:	@node - uid tree node to delete
  * Output:
  * Return:	void
 */
@@ -406,17 +406,17 @@ static void del_uid_tree_node(UID_TREE_NODE *ut_node)
  * Output:
  * Return:	void
 */
-static void del_uid(kuid_t uid)
+static void del_uid(u32 uid)
 {
 	UID_TREE_NODE *ut_node = NULL;
 
-	write_lock_bh(&uid_rwlock);
+	write_lock(&uid_rwlock);
 	ut_node = search_uid(uid);
 	if (!IS_ERR_OR_NULL(ut_node)) {
 		/*uid exists*/
 		del_uid_tree_node(ut_node);
 	}
-	write_unlock_bh(&uid_rwlock);
+	write_unlock(&uid_rwlock);
 }
 
 /*
@@ -433,7 +433,7 @@ static void clean_up_uid_tree(void)
 
 	/*find smallest uid*/
 	node = rb_first(&uid_tree_root);
-	write_lock_bh(&uid_rwlock);
+	write_lock(&uid_rwlock);
 	while (!IS_ERR_OR_NULL(node)) {
 		pos = rb_entry(node, UID_TREE_NODE, uid_node);
 
@@ -443,7 +443,7 @@ static void clean_up_uid_tree(void)
 		}
 		node = rb_first(&uid_tree_root);
 	}
-	write_unlock_bh(&uid_rwlock);
+	write_unlock(&uid_rwlock);
 }
 
 /*
@@ -537,7 +537,7 @@ static int get_skb_ipport(struct sk_buff *skb, u8 ip_version, IPPORT *ipport)
  * Description: get the packet time from sk_buff if exists,
  *				or get the day time instead
  * Input:	@skb - source buffer
- * Output:	@pkt_time - PACKET_TIME struct to save the time
+ * Output:	@time - PACKET_TIME struct to save the time
  * Return:	void
 */
 static void get_skb_packet_time(struct sk_buff *skb, PACKET_TIME *pkt_time)
@@ -561,7 +561,7 @@ static void get_skb_packet_time(struct sk_buff *skb, PACKET_TIME *pkt_time)
  * Input:	@skb - source buffer
  *			@ip_version - ip version, ipv4 or ipv6
  *			@dir - skb transmission direction, in or out
- * Output:	@mnt_info - MONITOR_INFO struct to save the info
+ * Output:	@info - MONITOR_INFO struct to save the info
  * Return:	-1 -- failed
  *			0 -- successed
 */
@@ -678,7 +678,7 @@ static struct sock *get_tcp_sk(struct sk_buff *skb, IPPORT *ipport, u8 ip_versio
  * Return:	ERROR_UID -- failed
  *			uid -- successed
 */
-static kuid_t get_i_uid(struct sock *sk)
+static u32 get_i_uid(struct sock *sk)
 {
 	if ((TCP_ESTABLISHED == sk->sk_state) || (TCP_LISTEN == sk->sk_state)) {
 		return sock_i_uid(sk);
@@ -694,7 +694,7 @@ static kuid_t get_i_uid(struct sock *sk)
  * Return:	ERROR_UID -- failed
  *			uid -- successed
 */
-static kuid_t get_f_uid(struct sock *sk)
+static u32 get_f_uid(struct sock *sk)
 {
 	if (IS_ERR_OR_NULL(sk->sk_socket)) {
 		return ERROR_UID;
@@ -718,11 +718,11 @@ static kuid_t get_f_uid(struct sock *sk)
  * Return:	ERROR_UID -- failed
  *			uid -- successed
 */
-static kuid_t get_skb_uid(struct sk_buff *skb, u8 ip_version, int dir)
+static u32 get_skb_uid(struct sk_buff *skb, u8 ip_version, int dir)
 {
 	struct sock *sk = NULL;
 	IPPORT ipport;
-	kuid_t uid = 0;
+	u32 uid = 0;
 
 	if (!IS_ERR_OR_NULL(skb->sk) && DIR_LOCAL_OUT == dir) {
 		/*sock in sk_buff exists*/
@@ -749,8 +749,8 @@ static kuid_t get_skb_uid(struct sk_buff *skb, u8 ip_version, int dir)
 /*
  * Function: is_time_match
  * Description: check time list whether packet time exists
- * Input:	@time_header - time list head pointer
- *			@pkt_time - packet time to match
+ * Input:	@header - time list head pointer
+ *			@time - packet time to match
  * Output:
  * Return:	false -- non-existent
  *			true -- existent
@@ -773,7 +773,7 @@ static bool is_time_match(struct list_head *time_header, PACKET_TIME *pkt_time)
  * Description: check uid tree whether sk_buff is wanted by matching
  *				uid, monitor state, data_len and packet time
  * Input:	@skb - source buffer
- *			@skb_info - info to match
+ *			@info - info to match
  * Output:
  * Return:	false -- not matched
  *			true -- matched
@@ -783,7 +783,7 @@ static bool match_uid(struct sk_buff *skb, SKB_MATCH_INFO *skb_info)
 	UID_TREE_NODE *ut_node = NULL;
 	bool ret = false;
 
-	read_lock_bh(&uid_rwlock);
+	read_lock(&uid_rwlock);
 	ut_node = search_uid(skb_info->uid_info.uid);
 	if (IS_ERR_OR_NULL(ut_node)) {
 		/*uid not exists*/
@@ -809,14 +809,14 @@ static bool match_uid(struct sk_buff *skb, SKB_MATCH_INFO *skb_info)
 	}
 	ret = true;
 not_match:
-	read_unlock_bh(&uid_rwlock);
+	read_unlock(&uid_rwlock);
 	return ret;
 }
 
 /*
  * Function: pack_monitor_info
  * Description: pack monitor info into a char buffer
- * Input:	@mnt_info - source info
+ * Input:	@info - source info
  *			@ip_version - IP version, ipv4 or ipv6
  * Output:	@buf - buffer to save the info
  * Return:	-1 -- failed
@@ -843,7 +843,7 @@ static int pack_monitor_info(MONITOR_INFO *mnt_info, u8 ip_version, char *buf)
 /*
  * Function: send_up_monitor_info
  * Description: send up monitor info to user
- * Input:	@mnt_info - info to send up
+ * Input:	@info - info to send up
  *			@ip_version - IP version, ipv4 or ipv6
  * Output:
  * Return:	-1 -- failed
@@ -908,17 +908,17 @@ static void request_answer(void)
  * Output:
  * Return:	@void
 */
-static void update_monitor_state(kuid_t uid, u8 state)
+static void update_monitor_state(u32 uid, u8 state)
 {
 	UID_TREE_NODE *pnode = NULL;
 
-	write_lock_bh(&uid_rwlock);
+	write_lock(&uid_rwlock);
 	pnode = search_uid(uid);
 	if (!IS_ERR_OR_NULL(pnode)) {
 		/*uid exists*/
 		pnode->mnt_state = state;
 	}
-	write_unlock_bh(&uid_rwlock);
+	write_unlock(&uid_rwlock);
 }
 
 /*

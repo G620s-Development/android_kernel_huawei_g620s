@@ -710,49 +710,18 @@ struct screen_info screen_info = {
 #endif
 
 #ifdef CONFIG_HUAWEI_KERNEL
+#define RUNMODE_FLAG_FACTORY 1
+#define RUNMODE_FLAG_NORMAL 0
 
-typedef enum
+static unsigned int runmode_factory = RUNMODE_FLAG_NORMAL;
+
+int __init parse_tag_runmode_flag (const struct tag* tags )
 {
-    RUNMODE_FLAG_NORMAL,
-    RUNMODE_FLAG_FACTORY,
-    RUNMODE_FLAG_UNKNOW
-}hw_runmode_t;
-
-#define RUNMODE_FLAG_NORMAL_KEY     "normal"
-#define RUNMODE_FLAG_FACTORY_KEY    "factory"
-
-static hw_runmode_t runmode_factory = RUNMODE_FLAG_UNKNOW;
-
-static int __init init_runmode(char *str)
-{
-    if(!str || !(*str))
-    {
-        printk(KERN_CRIT"%s:get run mode fail\n",__func__);
-        return 0;
-    }
-
-    if(!strncmp(str, RUNMODE_FLAG_NORMAL_KEY, sizeof(RUNMODE_FLAG_NORMAL_KEY)-1))
-    {
-        runmode_factory = RUNMODE_FLAG_NORMAL;
-        printk(KERN_NOTICE "%s:run mode is normal\n", __func__);
-    }
-    else if(!strncmp(str, RUNMODE_FLAG_FACTORY_KEY, sizeof(RUNMODE_FLAG_FACTORY_KEY)-1))
-    {
-        runmode_factory = RUNMODE_FLAG_FACTORY;
-        printk(KERN_NOTICE "%s:run mode is factory\n", __func__);
-    }
-    else
-    {
-        runmode_factory = RUNMODE_FLAG_UNKNOW;
-        printk(KERN_CRIT "%s:run mode unknow,str=%-10s\n", __func__,str);
-        return 0;
-    }
-    return 1;
+    runmode_factory = (int)tags->u.revision.rev;
+    printk("Factory : parse_tag_runmode_flag() = %d\n", runmode_factory);
+    return 0;
 }
-
-__setup("androidboot.huawei_swtype=", init_runmode);
-
-
+__tagtable(ATAG_RUNMODE_FLAG, parse_tag_runmode_flag);
 /* the function interface to check factory/normal mode in kernel */
 bool is_runmode_factory(void)
 {
@@ -761,9 +730,6 @@ bool is_runmode_factory(void)
     else
         return false;
 }
-
-EXPORT_SYMBOL(is_runmode_factory);
-
 #endif
 
 static int __init customize_machine(void)
