@@ -97,3 +97,7 @@ x509.genkey
 !drivers/input/touchscreen/focaltech/focaltech_Jun_0X85_ULC02.i
 !drivers/input/touchscreen/focaltech/focaltech_Jun_0X85_Y550.i
 !drivers/input/touchscreen/focaltech/ft6x06_lansi_firmware.i
+!drivers/input/touchscreen/mstar/ulc02_eely_custom_msg2133.i
+!drivers/input/touchscreen/mstar/ulc02_mutto_custom_msg2133.i
+!drivers/input/touchscreen/mstar/ulc02_ofilm_custom_msg2133.i
+!drivers/input/touchscreen/mstar/y550_ofilm_custom_msg2133.i
