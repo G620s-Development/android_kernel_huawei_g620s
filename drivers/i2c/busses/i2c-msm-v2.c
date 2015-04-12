@@ -3312,7 +3312,7 @@ static void i2c_msm_pm_xfer_end(struct i2c_msm_ctrl *ctrl)
 	} else {
 		i2c_msm_pm_suspend(ctrl->dev);
 	}
-
+	disable_irq(ctrl->rsrcs.irq);
 	mutex_unlock(&ctrl->xfer.mtx);
 }
 
